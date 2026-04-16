@@ -1,12 +1,14 @@
 INFORMAZIONI APPARTAMENTO - JUAN LES PINES
 
 INDIRIZZO E ACCESSO
-Indirizzo: [INSERISCI INDIRIZZO COMPLETO]
-Piano: [INSERISCI PIANO]
-Citofono: [INSERISCI NOME SUL CITOFONO]
-Codice cassaforte chiavi: [INSERISCI CODICE]
-Check-in: dalle 15:00 alle 20:00
-Check-out: entro le 11:00
+Indirizzo: 93 Bd Raymond Poincaré06160 Antibes, Francia
+Ingresso Box auto : 67 Chem. des Liserons
+Antibes, Francia
+Piano: 2 Piano
+Citofono: GUZZI
+Codice KeyBox : 8492
+Check-in: dalle 16:00
+Check-out: entro le 10:00
 
 WIFI
 Nome rete: [INSERISCI NOME RETE]
@@ -59,3 +61,45 @@ ISTRUZIONI CHECK-OUT
 3. Spegnere aria condizionata e luci
 4. Portare i rifiuti fuori
 5. [ALTRI STEP SE NECESSARI]
+
+🍽️ RISTORANTI
+Restaurant Le J — 17 Av. Dr Dautheville · ~500m · ☎ +33 4 93 74 15 14
+⭐ 4.8 · Cucina francese creativa, piccolo e curato, considerato il migliore della zona. Chiuso lun e dom. Prenotazione obbligatoria.
+Cap Riviera — 13 Bd Édouard Baudoin · ~350m · ☎ +33 4 93 61 22 30
+⭐ 4.6 · Cucina di pesce direttamente sul mare. Aperto tutti i giorni a pranzo e cena. Ottima scelta per una serata romantica con i tuoi ospiti.
+Le Bistrot — 27 Av. Amiral Courbet · ~900m · ☎ +33 4 93 74 51 28
+⭐ 4.6 · Bistrot francese tradizionale, amato dai locali. Chiuso mercoledì. Atmosphere raccolta con giardino esterno.
+Ti Toques — 9 Av. Louis Gallet · ~700m · ☎ +33 4 92 90 25 12
+⭐ 4.7 · Qualità da stellato Michelin a prezzi ragionevoli. Specialità di pesce e ottima selezione. Chiuso lun e dom.
+L'Escale — 8 Bd Édouard Baudoin · ~450m · ☎ +33 4 93 61 80 08
+⭐ 4.2 · Aperto dalle 9 alle 22 tutti i giorni, anche domenica. Il posto ideale per colazione, pranzo o una cena informale sul lungomare.
+L'Horizon — 37 Bis Bd Charles Guillaumont · ~1,1km · ☎ +33 4 93 67 23 11
+⭐ 4.3 · Vista sulla spiaggia di Antibes, ottima paella e frutti di mare. Bel rapporto qualità/prezzo.
+
+💊 FARMACIE
+Pharmacie Provençale et du Casino — 144 Bd du Président Wilson · ~500m · ☎ +33 4 93 61 09 23
+⭐ 4.3 · Staff che parla inglese. Lun-Sab 9:00–12:30 / 14:30–19:00. Chiusa domenica.
+Pharmacie de la Gare — 1 Bis Av. l'Estérel · ~700m · ☎ +33 4 93 61 01 24
+⭐ 4.2 · Lun-Ven 8:30–19:30 / Sab 8:30–13:00 e 14:00–19:00. Chiusa domenica.
+Pharmacie de l'Estérel — 8 Av. l'Estérel · ~800m · ☎ +33 4 93 61 05 38
+⭐ 4.2 · Personale che parla inglese. Lun-Ven 8:30–19:00 / Sab 8:30–12:30 e 14:30–18:30.
+
+🛒 SUPERMERCATI
+Auchan Supermarché — 138 Bd du Président Wilson · ~550m · ☎ +33 4 97 21 75 00
+⭐ 4.3 · Il più grande della zona. Lun-Sab 8:00–20:00 / Dom 8:30–12:30.
+Carrefour City — 122 Bd du Président Wilson · ~700m · ☎ +33 9 67 11 13 24
+⭐ 3.9 · Aperto fino alle 21:00 tutti i giorni, anche domenica (8:00–21:00). Comodo per acquisti veloci serali.
+
+🌴 ATTIVITÀ E COSE DA FARE
+Parc de la Pinède — 7 Bd de la Pinède · ~400m
+⭐ 4.6 · Parco apertissimo H24, con area giochi per bambini. Uno dei migliori parco-giochi della Costa Azzurra secondo le recensioni.
+Plage de Juan-les-Pins — Bd de la Pinède · ~1km · ☎ +33 4 93 61 16 74
+⭐ 4.4 · Spiaggia sabbiosa con bagnini e docce. Una delle rare spiagge sabbiose della zona. Acqua cristallina.
+Parc Exflora — Av. de Cannes · ~1,8km · ☎ +33 4 97 21 42 60
+⭐ 4.3 · Parco botanico con laghetto e fontana. Aperto 8:00–21:00 (9:00 nel weekend). Perfetto per una passeggiata mattutina.
+Baie des Milliardaires — Chemin des Douaniers · ~3km
+⭐ 4.5 · Caletta spettacolare con acque turchesi, uno degli scorci più belli di tutta la Riviera. Chiusa il lunedì.
+Office de Tourisme Antibes Juan-les-Pins — 60 Chemin des Sables · ~500m · ☎ +33 4 22 10 60 01
+⭐ 4.1 · Lun-Sab 9:30–12:30 / 14:00–18:00, Dom 9:00–13:00. Trovi tutte le info sul famoso Jazz à Juan (festival jazz estivo) e sulle escursioni in barca.
+
+💡 Nota utile per i tuoi ospiti: tutto il centro di Juan-les-Pins è raggiungibile a piedi dall'appartamento. I ristoranti migliori (Le J, Ti Toques, Le Bistrot) è consigliabile prenotarli in anticipo specialmente d'estate.
