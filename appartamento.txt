@@ -1,0 +1,61 @@
+INFORMAZIONI APPARTAMENTO - JUAN LES PINES
+
+INDIRIZZO E ACCESSO
+Indirizzo: [INSERISCI INDIRIZZO COMPLETO]
+Piano: [INSERISCI PIANO]
+Citofono: [INSERISCI NOME SUL CITOFONO]
+Codice cassaforte chiavi: [INSERISCI CODICE]
+Check-in: dalle 15:00 alle 20:00
+Check-out: entro le 11:00
+
+WIFI
+Nome rete: [INSERISCI NOME RETE]
+Password: [INSERISCI PASSWORD]
+
+DOTAZIONI
+Numero camere: [INSERISCI]
+Numero bagni: [INSERISCI]
+Posti letto: [INSERISCI]
+Aria condizionata: [SI/NO]
+Lavatrice: [SI/NO - istruzioni: INSERISCI]
+Lavastoviglie: [SI/NO]
+Asciugacapelli: [SI/NO]
+Ferro da stiro: [SI/NO]
+
+CUCINA
+Attrezzatura disponibile: [ELENCA]
+Moka/Caffettiera: [SI/NO]
+Forno: [SI/NO]
+Microonde: [SI/NO]
+
+REGOLE
+- Vietato fumare in appartamento
+- Animali: [AMMESSI/NON AMMESSI]
+- Silenzio dalle 22:00 alle 08:00
+- Feste non consentite
+- Rifiuti: [INSERISCI ISTRUZIONI RACCOLTA DIFFERENZIATA]
+
+PARCHEGGIO
+[INSERISCI INFORMAZIONI PARCHEGGIO]
+
+SPIAGGIA E CENTRO
+[INSERISCI DISTANZE E INDICAZIONI]
+
+SUPERMERCATI VICINI
+[INSERISCI NOMI E ORARI]
+
+RISTORANTI CONSIGLIATI
+[INSERISCI CONSIGLI]
+
+EMERGENZE E CONTATTI
+Proprietario: [NOME] - [TELEFONO]
+Emergenze: 112
+Ospedale più vicino: [INSERISCI]
+Farmacia più vicina: [INSERISCI]
+
+ISTRUZIONI CHECK-OUT
+1. Lasciare le chiavi in: [DOVE]
+2. Chiudere tutte le finestre
+3. Spegnere aria condizionata e luci
+4. Portare i rifiuti fuori
+5. [ALTRI STEP SE NECESSARI]

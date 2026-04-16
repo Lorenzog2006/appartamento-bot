@@ -1,13 +1,11 @@
 from http.server import BaseHTTPRequestHandler
 import json, os, urllib.request
-from groq import Groq
-from docx import Document
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
 OWNER_ID = os.environ.get("OWNER_CHAT_ID")
 
-DOCX_PATH = os.path.join(os.path.dirname(__file__), "..", "appartamento.docx")
+INFO_PATH = os.path.join(os.path.dirname(__file__), "..", "appartamento.txt")
 
 
 def invia_messaggio(chat_id, testo):
@@ -19,10 +17,41 @@ def invia_messaggio(chat_id, testo):
 
 def leggi_info():
     try:
-        doc = Document(DOCX_PATH)
-        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-    except Exception as e:
+        with open(INFO_PATH, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
         return "Informazioni appartamento non disponibili."
+
+
+def chiedi_ai(domanda, info):
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Sei un assistente virtuale per un appartamento in affitto su Booking e Airbnb. "
+                    "Rispondi SOLO con le informazioni qui sotto. "
+                    "Se non hai l'informazione richiesta, di' che contatterai il proprietario al più presto. "
+                    "Rispondi nella stessa lingua dell'ospite. Sii cordiale e conciso.\n\n"
+                    f"INFORMAZIONI APPARTAMENTO:\n{info}"
+                )
+            },
+            {"role": "user", "content": domanda}
+        ]
+    }
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        url, data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {GROQ_KEY}"
+        }
+    )
+    r = urllib.request.urlopen(req, timeout=25)
+    result = json.loads(r.read())
+    return result["choices"][0]["message"]["content"]
 
 
 class handler(BaseHTTPRequestHandler):
@@ -31,7 +60,6 @@ class handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))
-
             message = body.get("message", {})
             chat_id = message.get("chat", {}).get("id")
             testo = message.get("text", "")
@@ -41,7 +69,6 @@ class handler(BaseHTTPRequestHandler):
                 self._ok()
                 return
 
-            # Comando /start
             if testo == "/start":
                 invia_messaggio(chat_id, "Ciao! Sono l'assistente virtuale dell'appartamento. Come posso aiutarti? 😊")
                 self._ok()
@@ -51,40 +78,23 @@ class handler(BaseHTTPRequestHandler):
                 self._ok()
                 return
 
-            # Notifica al proprietario
+            # Notifica il proprietario
             if OWNER_ID and str(chat_id) != OWNER_ID:
                 try:
                     invia_messaggio(OWNER_ID, f"📩 Messaggio da {nome} (ID: {chat_id}):\n\n{testo}")
-                except:
+                except Exception:
                     pass
 
             # Risposta AI
             try:
                 info = leggi_info()
-                client = Groq(api_key=GROQ_KEY)
-                risposta = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": (
-                                "Sei un assistente virtuale per un appartamento in affitto su Booking e Airbnb. "
-                                "Rispondi SOLO con le informazioni qui sotto. "
-                                "Se non hai l'informazione, di' che contatterai il proprietario al più presto. "
-                                "Rispondi nella stessa lingua dell'ospite. Sii cordiale e conciso.\n\n"
-                                f"INFORMAZIONI APPARTAMENTO:\n{info}"
-                            )
-                        },
-                        {"role": "user", "content": testo}
-                    ]
-                )
-                reply = risposta.choices[0].message.content
-            except Exception as e:
+                reply = chiedi_ai(testo, info)
+            except Exception:
                 reply = "Mi dispiace, al momento non riesco a rispondere. Il proprietario sarà contattato al più presto!"
 
             invia_messaggio(chat_id, reply)
 
-        except Exception as e:
+        except Exception:
             pass
 
         self._ok()
