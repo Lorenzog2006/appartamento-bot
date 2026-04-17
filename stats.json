@@ -1,10 +1,10 @@
 {
-  "totale": 5,
+  "totale": 6,
   "lingue": {
-    "italian": 5
+    "italian": 6
   },
   "argomenti": {
     "parcheggio": 2,
-    "altro": 3
+    "altro": 4
   }
 }
