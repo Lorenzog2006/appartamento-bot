@@ -153,6 +153,10 @@ Office de Tourisme Antibes Juan-les-Pins — 60 Chemin des Sables · ~500m · �
 
 💡 Nota utile per i tuoi ospiti: tutto il centro di Juan-les-Pins è raggiungibile a piedi dall'appartamento. I ristoranti migliori (Le J, Ti Toques, Le Bistrot) è consigliabile prenotarli in anticipo specialmente d'estate.
 
+
+# Aggiunto il 17/04/2026
+il parcheggio si trova alle spalle dell’ingresso del condominio in 67 Chem. Des Liserons
+
 [MEDIA]
 # Formato: parole_chiave = tipo:file_id | Didascalia
 # tipo può essere: photo oppure video
