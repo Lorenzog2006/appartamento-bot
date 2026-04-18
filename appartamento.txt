@@ -157,6 +157,10 @@ Office de Tourisme Antibes Juan-les-Pins — 60 Chemin des Sables · ~500m · �
 # Aggiunto il 17/04/2026
 il parcheggio si trova alle spalle dell’ingresso del condominio in 67 Chem. Des Liserons
 
+
+# Aggiunto il 18/04/2026
+L’appartamento dista circa 600 metri dall’appartamento
+
 [MEDIA]
 # Formato: parole_chiave = tipo:file_id | Didascalia
 # tipo può essere: photo oppure video
