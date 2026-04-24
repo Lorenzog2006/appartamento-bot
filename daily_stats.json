@@ -1,15 +1,16 @@
 {
   "data": "24/04/2026",
-  "totale": 5,
+  "totale": 6,
   "lingue": {
     "italian": 3,
     "french": 1,
-    "english": 1
+    "english": 2
   },
   "argomenti": {
     "altro": 3,
     "parcheggio": 1,
-    "wifi": 1
+    "wifi": 1,
+    "check-in": 1
   },
   "ospiti": [
     "8668813727"
