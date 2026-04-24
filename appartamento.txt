@@ -231,6 +231,10 @@ In auto: ~25-30 min (senza traffico)
 In treno: Antibes → Nizza centro (~20 min) + bus navetta aeroporto (~8 min) = ~40 min totali
 In taxi: ~50-70€
 
+
+# Aggiunto il 24/04/2026
+Check out ore 10:00
+
 [MEDIA]
 # Formato: parole_chiave = tipo:file_id | Didascalia
 # tipo può essere: photo oppure video
