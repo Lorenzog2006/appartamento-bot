@@ -1,5 +1,25 @@
 INFORMAZIONI APPARTAMENTO - JUAN LES PINES
 
+=== RISPOSTE RAPIDE — DOMANDE FREQUENTI ===
+Check-in: dalle 16:00
+Check-out: entro le 10:00
+Indirizzo appartamento: 93 Boulevard Raymond Poincaré, 06160 Antibes (Juan-les-Pins), Francia
+Piano: 2° piano, appartamento numero 23 (si vede in alto a destra sulla porta)
+Citofono: GUZZI
+Codice KeyBox (cassettina chiavi): 8492 — contiene il telecomando del garage
+Ingresso garage: 67 Chemin des Liserons, Antibes
+Posto auto: numero 53 (ultimo a sinistra a ridosso del muro, in fondo alla rampa)
+Wifi: vedi nome rete e password su foglio in casa
+Lavatrice: sì, presente in appartamento
+Lavastoviglie: no
+Aria condizionata: sì, in soggiorno e in camera da letto
+Posti letto: 4
+Camere: 2
+Bagni: 1
+Proprietario: Lorenzo — contatto disponibile su richiesta
+Spiaggia più vicina: 150 metri a piedi
+===========================================
+
 INDIRIZZO E ACCESSO
 Indirizzo: 93 Bd Raymond Poincaré06160 Antibes, Francia
 Ingresso Box auto : 67 Chem. des Liserons
@@ -108,6 +128,32 @@ L'Horizon — 37 Bis Bd Charles Guillaumont · ~1,1km · ☎ +33 4 93 67 23 11
 
 EMERGENZE E CONTATTI
 Proprietario: Lorenzo - 00393202599675
+
+🔧 EMERGENZE TECNICHE APPARTAMENTO
+In caso di guasto o problema urgente contatta subito il proprietario Lorenzo: +39 320 259 9675
+
+🪠 IDRAULICO — Pronto intervento 24h/24
+DCI Plombier (Antibes/Juan-les-Pins): +33 4 93 91 46 73
+Providence Plomberie (intervento in 15-30 min): +33 6 14 60 24 48
+ChronoServe: +33 9 72 51 99 85
+
+⚡ ELETTRICISTA — Pronto intervento 24h/24
+Azur Service 06: +33 4 22 46 12 21
+SDS Électricité: +33 4 22 13 31 48
+ChronoServe: +33 9 72 51 99 85
+
+🔑 FABBRO (porta bloccata / serratura) — 24h/24
+Serrurier Caillet 06 (Antibes/Juan-les-Pins): +33 4 22 61 73 28
+DCI Serrurier: +33 4 93 91 46 73
+
+🔥 EMERGENZA GAS
+Chiudi subito il rubinetto del gas, apri tutte le finestre, esci dall'appartamento e chiama: 0800 47 33 33 (gratuito 24h/24)
+
+💧 ALLAGAMENTO / PERDITA ACQUA
+Chiudi il rubinetto generale dell'acqua (sotto il lavello in cucina) e chiama subito il proprietario e l'idraulico.
+
+⚡ BLACKOUT / GUASTO ELETTRICO
+Controlla il quadro elettrico nel corridoio: se gli interruttori sono abbassati, rialzali. Se il problema persiste chiama il proprietario e l'elettricista.
 🏥 STRUTTURE SANITARIE VICINE
 🟢 Prima scelta — urgenze non gravi
 Maison Médicale MMF Santé · 60 Chemin des Sables, Juan-les-Pins · ~500m a piedi · ☎ +33 4 92 38 35 32
@@ -153,17 +199,37 @@ Office de Tourisme Antibes Juan-les-Pins — 60 Chemin des Sables · ~500m · �
 
 💡 Nota utile per i tuoi ospiti: tutto il centro di Juan-les-Pins è raggiungibile a piedi dall'appartamento. I ristoranti migliori (Le J, Ti Toques, Le Bistrot) è consigliabile prenotarli in anticipo specialmente d'estate.
 
+TRASPORTI
 
-# Aggiunto il 17/04/2026
-il parcheggio si trova alle spalle dell’ingresso del condominio in 67 Chem. Des Liserons
+🚆 TRENO (TER / SNCF)
+Stazione più vicina: Gare de Juan-les-Pins (~1,2km a piedi) oppure Gare d'Antibes (~2,5km)
+Frequenza: fino a 87 treni al giorno — praticamente ogni 10-15 minuti nelle ore di punta
+Juan-les-Pins / Antibes → Nizza: ~20-25 minuti · da ~3€
+Juan-les-Pins / Antibes → Cannes: ~10-15 minuti · da ~3€
+Juan-les-Pins / Antibes → Monaco: ~50 minuti
+Juan-les-Pins / Antibes → Marsiglia: ~2h30
+Orari e biglietti: sncf-connect.com oppure app SNCF Connect
+💡 Il treno è il mezzo più veloce e comodo per raggiungere Nizza e Cannes — molto più rapido dell'auto in estate.
 
+🚌 BUS URBANO (Envibus)
+Rete locale che copre Antibes, Juan-les-Pins, Sophia Antipolis e dintorni
+Orari: dal lunedì al sabato 6:00–21:00 circa, domenica con servizio ridotto
+Frequenza: ogni 15-30 minuti sulle linee principali
+Linea A: collega Juan-les-Pins al centro di Antibes e alla stazione
+Biglietto singolo: ~1,50€ · si acquista sull'autobus o alle edicole
+Orari in tempo reale: envibus.fr oppure app Moovit
+💡 Utile per spostarsi nel centro di Antibes e raggiungere la stazione senza prendere l'auto.
 
-# Aggiunto il 18/04/2026
-L’appartamento dista circa 600 metri dall’appartamento
+🚕 TAXI / VTC
+Numero taxi Antibes: +33 4 93 67 67 67
+App disponibili: Uber, Bolt (copertura variabile)
+Antibes → Aeroporto di Nizza (NCE): ~30 min · circa 50-70€
 
-
-# Aggiunto il 23/04/2026
-Il check out è alle 10
+✈️ AEROPORTO DI NIZZA (NCE)
+Distanza: ~25km da Juan-les-Pins
+In auto: ~25-30 min (senza traffico)
+In treno: Antibes → Nizza centro (~20 min) + bus navetta aeroporto (~8 min) = ~40 min totali
+In taxi: ~50-70€
 
 [MEDIA]
 # Formato: parole_chiave = tipo:file_id | Didascalia
