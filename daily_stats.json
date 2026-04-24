@@ -1,11 +1,12 @@
 {
   "data": "24/04/2026",
-  "totale": 1,
+  "totale": 2,
   "lingue": {
-    "italian": 1
+    "italian": 2
   },
   "argomenti": {
-    "altro": 1
+    "altro": 1,
+    "parcheggio": 1
   },
   "ospiti": [
     "8668813727"
