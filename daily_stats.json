@@ -1,13 +1,13 @@
 {
   "data": "24/04/2026",
-  "totale": 4,
+  "totale": 5,
   "lingue": {
-    "italian": 2,
+    "italian": 3,
     "french": 1,
     "english": 1
   },
   "argomenti": {
-    "altro": 2,
+    "altro": 3,
     "parcheggio": 1,
     "wifi": 1
   },
