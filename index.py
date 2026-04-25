@@ -12,7 +12,7 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
 WA_TOKEN        = os.environ.get("WHATSAPP_TOKEN")
 WA_PHONE_ID     = os.environ.get("WHATSAPP_PHONE_ID")
-WA_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "juanlespins2026")
+WA_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "juanlespins2026").strip()
 
 REPO         = "Lorenzog2006/appartamento-bot"
 GITHUB_RAW   = f"https://raw.githubusercontent.com/{REPO}/main/appartamento.txt"
