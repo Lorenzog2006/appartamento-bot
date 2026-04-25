@@ -212,18 +212,29 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Verifica webhook da Meta."""
         try:
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            mode      = params.get("hub.mode", [""])[0]
-            token     = params.get("hub.verify_token", [""])[0]
-            challenge = params.get("hub.challenge", [""])[0]
-            if mode == "subscribe" and token.strip() == WA_VERIFY_TOKEN:
+            # Vercel potrebbe passare il path in self.path oppure solo la query
+            full_path = self.path
+            parsed    = urllib.parse.urlparse(full_path)
+            params    = urllib.parse.parse_qs(parsed.query)
+            mode      = params.get("hub.mode", [""])[0].strip()
+            token     = params.get("hub.verify_token", [""])[0].strip()
+            challenge = params.get("hub.challenge", [""])[0].strip()
+            # Debug: ritorna i parametri ricevuti se manca hub.challenge
+            if not challenge:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(f"path={full_path} mode={mode} token={token} wa_token={WA_VERIFY_TOKEN}".encode())
+                return
+            if mode == "subscribe" and token == WA_VERIFY_TOKEN:
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(challenge.encode())
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(f"exception: {e}".encode())
+            return
         self.send_response(403)
         self.end_headers()
         self.wfile.write(b"Unauthorized")
