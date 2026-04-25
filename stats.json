@@ -1,7 +1,7 @@
 {
-  "totale": 60,
+  "totale": 61,
   "lingue": {
-    "italian": 52,
+    "italian": 53,
     "english": 6,
     "french": 2
   },
@@ -9,7 +9,7 @@
     "parcheggio": 10,
     "altro": 35,
     "lavatrice": 1,
-    "ristorante": 2,
+    "ristorante": 3,
     "spiaggia": 5,
     "wifi": 2,
     "check-in": 4,
