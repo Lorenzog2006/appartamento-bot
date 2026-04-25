@@ -10,7 +10,7 @@ ANTHROPIC_KEY  = os.environ.get("ANTHROPIC_KEY")
 OWNER_ID       = os.environ.get("OWNER_CHAT_ID")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
-WA_TOKEN        = os.environ.get("WHATSAPP_TOKEN")
+WA_TOKEN        = (os.environ.get("WHATSAPP_TOKEN") or "").strip()
 WA_PHONE_ID     = (os.environ.get("WHATSAPP_PHONE_ID") or "").strip()
 WA_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "juanlespins2026").strip()
 
