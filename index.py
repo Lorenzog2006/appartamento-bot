@@ -1281,8 +1281,15 @@ def wa_invia(to, testo):
             "Authorization": f"Bearer {WA_TOKEN}"
         })
         urllib.request.urlopen(req, timeout=10)
-    except Exception:
-        pass
+    except Exception as e:
+        # Notifica Lorenzo dell'errore di invio WhatsApp
+        try:
+            telegram("sendMessage", {
+                "chat_id": OWNER_ID,
+                "text": f"⚠️ WA errore invio a {to}:\n{e}\nPHONE_ID={WA_PHONE_ID}\nTOKEN={'ok' if WA_TOKEN else 'MANCANTE'}"
+            })
+        except Exception:
+            pass
 
 
 # ── WhatsApp webhook ──────────────────────────────────────────────────────────
