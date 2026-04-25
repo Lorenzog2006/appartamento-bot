@@ -9,7 +9,7 @@ OWNER_ID        = os.environ.get("OWNER_CHAT_ID")
 TELEGRAM_TOKEN  = os.environ.get("TELEGRAM_TOKEN")
 WA_TOKEN        = os.environ.get("WHATSAPP_TOKEN")
 WA_PHONE_ID     = os.environ.get("WHATSAPP_PHONE_ID")
-WA_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "juanlespins2026")
+WA_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "juanlespins2026").strip()
 
 REPO       = "Lorenzog2006/appartamento-bot"
 GITHUB_RAW = f"https://raw.githubusercontent.com/{REPO}/main/appartamento.txt"
@@ -217,7 +217,7 @@ class handler(BaseHTTPRequestHandler):
             mode      = params.get("hub.mode", [""])[0]
             token     = params.get("hub.verify_token", [""])[0]
             challenge = params.get("hub.challenge", [""])[0]
-            if mode == "subscribe" and token == WA_VERIFY_TOKEN:
+            if mode == "subscribe" and token.strip() == WA_VERIFY_TOKEN:
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(challenge.encode())
