@@ -1,7 +1,8 @@
 {
-  "functions": {
-    "api/webhook.py": {
-      "maxDuration": 30
+  "crons": [
+    {
+      "path": "/daily-report",
+      "schedule": "0 20 * * *"
     }
-  }
+  ]
 }
