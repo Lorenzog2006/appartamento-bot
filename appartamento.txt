@@ -235,6 +235,10 @@ In taxi: ~50-70€
 # Aggiunto il 24/04/2026
 Check out ore 10:00
 
+
+# Aggiunto il 25/04/2026
+Emergenza: Il numero di Lorenzo è +39 320 2599675
+
 [MEDIA]
 # Formato: parole_chiave = tipo:file_id | Didascalia
 # tipo può essere: photo oppure video
