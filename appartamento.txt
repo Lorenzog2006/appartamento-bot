@@ -46,9 +46,9 @@ Asciugacapelli: si
 Ferro da stiro: si
 
 CUCINA
-Attrezzatura disponibile: [ELENCA]
+Attrezzatura disponibile: Pentole, posate, pentole, padelle, piatti, bicchieri, scolapasta, tazze, tazzine
 Moka/Caffettiera: si della Nespresso
-Forno: [si
+Forno: si
 Microonde: si
 
 REGOLE
@@ -65,7 +65,7 @@ SPIAGGIA E CENTRO
 La prima spiaggia libera dista appena 150 metri dall'appartamento , poi ci sono altre spiagge 
 🏖️ SPIAGGE PUBBLICHE (gratuite)
 Plage de Juan-les-Pins · ~1km a piedi · ☎ +33 4 93 61 16 74
-⭐ 4.4 · La classica spiaggia sabbiosa di Juan. Acqua cristallina, bagnini, docce e servizi. Una delle poche spiagge sabbiose della zona. Può affollarssi d'estate.
+⭐ 4.4 · La classica spiaggia sabbiosa di Juan. Acqua cristallina, bagnini, docce e servizi. Una delle poche spiagge sabbiose.
 Plage d'Antibes Juan-les-Pins · ~1,3km a piedi
 ⭐ 4.4 · Spiaggia pubblica sul Bd Charles Guillaumont, sabbiosa, acqua bassa ottima per famiglie con bambini. Più tranquilla della precedente, con aria un po' più local.
 
@@ -83,7 +83,7 @@ L'Effet Mer Plage — 37 bis Bd Charles Guillaumont · ~1,1km · ☎ +33 6 38 30
 Villa Djunah Beach — Bd du Littoral · ~1,5km · ☎ +33 9 70 68 31 50
 ⭐ 4.0 · Lounge bar sulla spiaggia, atmosfera orientale e lussuosa. Aperto solo venerdì e sabato sera dalle 18:00 alle 2:00. Per una serata speciale.
 
-💡 Consiglio pratico per i tuoi ospiti: tutti gli stabilimenti privati si trovano sul Bd Charles Guillaumont, percorribile a piedi in 10-15 minuti dall'appartamento. Per l'estate ti consiglio di suggerire Yolo Plage come prima scelta — prenota i lettini online in anticipo perché si esauriscono presto in luglio/agosto.
+💡 Tutti gli stabilimenti privati si trovano sul Bd Charles Guillaumont, percorribile a piedi in 10-15 minuti dall'appartamento. Per l'estate ti consiglio di suggerire Yolo Plage come prima scelta — prenota i lettini online in anticipo perché si esauriscono presto in luglio/agosto.
 
 SUPERMERCATI VICINI
 🛒 SUPERMERCATI — dal più vicino al più lontano
@@ -197,7 +197,7 @@ Baie des Milliardaires — Chemin des Douaniers · ~3km
 Office de Tourisme Antibes Juan-les-Pins — 60 Chemin des Sables · ~500m · ☎ +33 4 22 10 60 01
 ⭐ 4.1 · Lun-Sab 9:30–12:30 / 14:00–18:00, Dom 9:00–13:00. Trovi tutte le info sul famoso Jazz à Juan (festival jazz estivo) e sulle escursioni in barca.
 
-💡 Nota utile per i tuoi ospiti: tutto il centro di Juan-les-Pins è raggiungibile a piedi dall'appartamento. I ristoranti migliori (Le J, Ti Toques, Le Bistrot) è consigliabile prenotarli in anticipo specialmente d'estate.
+💡 Tutto il centro di Juan-les-Pins è raggiungibile a piedi dall'appartamento. I ristoranti migliori (Le J, Ti Toques, Le Bistrot) è consigliabile prenotarli in anticipo specialmente d'estate.
 
 TRASPORTI
 
