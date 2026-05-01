@@ -238,8 +238,11 @@ Disponibile foto con parole chiave: posto auto, parking, parkplatz, stationnemen
 Disponibile foto con parole chiave: ingresso, entrance, entrée, entrada, eingang — descrizione: Questo l’ingresso nello stabile
 # Aggiunto il 01/05/2026
 Disponibile foto con parole chiave: porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements — descrizione: Questa la porta di ingresso dell’appartamento
+# Aggiunto il 01/05/2026
+Disponibile foto con parole chiave: keybox, keybox, boite a cle, caja de llaves, schluesselkasten — descrizione: Qui dove si trova la keybox
 
 [MEDIA]
+keybox, keybox, boite a cle, caja de llaves, schluesselkasten = photo:AgACAgIAAxkBAAIC02n1CRzqGtbDUMFiJRzJNgWch3TsAALNFmsb-gOpS0bdN-CXWrsgAQADAgADeQADOwQ | Qui dove si trova la keybox
 porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements = photo:AgACAgIAAxkBAAICxGn1CDrtnZgvf5Ljqo9TrGM3jMaHAALKFmsb-gOpS4bNde530A-pAQADAgADeQADOwQ | Questa la porta di ingresso dell’appartamento
 ingresso, entrance, entrée, entrada, eingang = photo:AgACAgIAAxkBAAICvWn1B_rwuLRvTk6sDtCJNO0F0Du4AALJFmsb-gOpS3mDFlBXEPGGAQADAgADeQADOwQ | Questo l’ingresso nello stabile
 posto auto, parking, parkplatz, stationnement, estacionamiento, aparcamiento = photo:AgACAgIAAxkBAAICtmn1B6XpVxsbEHXxGqK4etTWOAqLAALHFmsb-gOpSyZ8PBwW-D01AQADAgADeQADOwQ | Questo il posto auto dove parcheggiare
