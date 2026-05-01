@@ -232,8 +232,11 @@ In treno: Antibes → Nizza centro (~20 min) + bus navetta aeroporto (~8 min) = 
 In taxi: ~50-70€
 # Aggiunto il 01/05/2026
 Disponibile foto con parole chiave: pattumiera, trash can, poubelle, basura, mülltonne — descrizione: Qui il locale dove buttare la pattumiera
+# Aggiunto il 01/05/2026
+Disponibile foto con parole chiave: posto auto, parking, parkplatz, stationnement, estacionamiento, aparcamiento — descrizione: Questo il posto auto dove parcheggiare
 
 [MEDIA]
+posto auto, parking, parkplatz, stationnement, estacionamiento, aparcamiento = photo:AgACAgIAAxkBAAICtmn1B6XpVxsbEHXxGqK4etTWOAqLAALHFmsb-gOpSyZ8PBwW-D01AQADAgADeQADOwQ | Questo il posto auto dove parcheggiare
 pattumiera, trash can, poubelle, basura, mülltonne = photo:AgACAgIAAxkBAAICm2n1BGnNCsL7s8srs4-bayE8A6bVAAK1Fmsb-gOpS2_Cd-vh0fwLAQADAgADeQADOwQ | Qui il locale dove buttare la pattumiera
 # Formato: parole_chiave = tipo:file_id | Didascalia
 # tipo può essere: photo oppure video
