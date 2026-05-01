@@ -1,8 +1,8 @@
 {
-  "totale": 81,
+  "totale": 82,
   "lingue": {
     "italian": 70,
-    "english": 7,
+    "english": 8,
     "french": 4
   },
   "argomenti": {
@@ -11,7 +11,7 @@
     "lavatrice": 1,
     "ristorante": 3,
     "spiaggia": 8,
-    "wifi": 4,
+    "wifi": 5,
     "check-in": 9,
     "emergenza": 1
   }
