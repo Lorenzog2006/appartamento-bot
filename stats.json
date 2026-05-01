@@ -1,7 +1,7 @@
 {
-  "totale": 75,
+  "totale": 76,
   "lingue": {
-    "italian": 66,
+    "italian": 67,
     "english": 7,
     "french": 2
   },
@@ -12,7 +12,7 @@
     "ristorante": 3,
     "spiaggia": 8,
     "wifi": 2,
-    "check-in": 6,
+    "check-in": 7,
     "emergenza": 1
   }
 }
