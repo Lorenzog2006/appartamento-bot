@@ -32,8 +32,8 @@ Check-in: dalle 16:00
 Check-out: entro le 10:00
 
 WIFI
-Nome rete: [INSERISCI NOME RETE]
-Password: [INSERISCI PASSWORD]
+Nome rete: Freebox-32B57A
+Password: ftctsqvmrdqv7wwwqmrvcd
 
 DOTAZIONI
 Numero camere: 2 camere
@@ -240,8 +240,7 @@ Disponibile foto con parole chiave: ingresso, entrance, entrée, entrada, eingan
 Disponibile foto con parole chiave: porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements — descrizione: Questa la porta di ingresso dell’appartamento
 # Aggiunto il 01/05/2026
 Disponibile foto con parole chiave: keybox, keybox, boite a cle, caja de llaves, schluesselkasten — descrizione: Qui dove si trova la keybox
-# Aggiunto il 01/05/2026
-Rete Wifi : Freebox-32B57A password : ftctsqvmrdqv7wwwqmrvcd
+
 
 [MEDIA]
 keybox, keybox, boite a cle, caja de llaves, schluesselkasten = photo:AgACAgIAAxkBAAIC02n1CRzqGtbDUMFiJRzJNgWch3TsAALNFmsb-gOpS0bdN-CXWrsgAQADAgADeQADOwQ | Qui dove si trova la keybox
