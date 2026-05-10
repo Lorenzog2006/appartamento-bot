@@ -9,6 +9,7 @@ GROQ_KEY       = (os.environ.get("GROQ_API_KEY") or "").strip()
 ANTHROPIC_KEY  = (os.environ.get("ANTHROPIC_KEY") or "").strip()
 OWNER_ID       = (os.environ.get("OWNER_CHAT_ID") or "").strip()
 GITHUB_TOKEN   = (os.environ.get("GITHUB_TOKEN") or "").strip()
+DASHBOARD_KEY  = (os.environ.get("DASHBOARD_KEY") or "").strip()
 
 WA_TOKEN        = (os.environ.get("WHATSAPP_TOKEN") or "").strip()
 WA_PHONE_ID     = (os.environ.get("WHATSAPP_PHONE_ID") or "").strip()
@@ -21,6 +22,7 @@ STATS_API       = f"https://api.github.com/repos/{REPO}/contents/stats.json"
 DAILY_STATS_API = f"https://api.github.com/repos/{REPO}/contents/daily_stats.json"
 BOOKINGS_API    = f"https://api.github.com/repos/{REPO}/contents/bookings.json"
 CONVERSATIONS_API = f"https://api.github.com/repos/{REPO}/contents/conversations.json"
+USERS_API       = f"https://api.github.com/repos/{REPO}/contents/users.json"
 INFO_PATH    = os.path.join(os.path.dirname(__file__), "appartamento.txt")
 
 # ── Stato sessioni ────────────────────────────────────────────────────────────
@@ -30,6 +32,11 @@ _conv_sha = None         # SHA del file conversations.json su GitHub
 _conv_loaded = False     # True dopo primo caricamento da GitHub
 MAX_MESSAGGI   = 10
 SCADENZA_ORE   = 2
+
+# Anagrafica utenti: chat_id → metadati cumulativi (totale msg, lingua, topic, ecc.)
+_users = {}
+_users_sha = None
+_users_loaded = False
 
 # chat_id ospite → {"nome": nome, "lingua": lingua} — aspettiamo le date
 _attesa_date = {}
@@ -146,6 +153,97 @@ def aggiorna_storia(chat_id, domanda, risposta):
     _conversazioni[cid]["storia"] = storia
     _conversazioni[cid]["ultimo"] = ora
     _salva_conversazioni_su_github()
+
+
+# ── Anagrafica utenti (users.json) ────────────────────────────────────────────
+def _carica_users_da_github():
+    global _users, _users_sha, _users_loaded
+    if _users_loaded or not GITHUB_TOKEN:
+        _users_loaded = True
+        return
+    try:
+        url = f"{USERS_API}?t={int(datetime.now().timestamp())}"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=4)
+        data = json.loads(r.read())
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        _users = json.loads(contenuto) if contenuto.strip() else {}
+        _users_sha = data["sha"]
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            _users = {}
+            _users_sha = None
+    except Exception:
+        pass
+    finally:
+        _users_loaded = True
+
+def _salva_users_su_github():
+    global _users_sha
+    if not GITHUB_TOKEN:
+        return
+    try:
+        contenuto_nuovo = json.dumps(_users, ensure_ascii=False, indent=2)
+        payload = {
+            "message": "Aggiorna anagrafica utenti",
+            "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+        }
+        if _users_sha:
+            payload["sha"] = _users_sha
+        req = urllib.request.Request(USERS_API, data=json.dumps(payload).encode(), headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        }, method="PUT")
+        r = urllib.request.urlopen(req, timeout=8)
+        risposta = json.loads(r.read())
+        _users_sha = risposta.get("content", {}).get("sha", _users_sha)
+    except urllib.error.HTTPError as e:
+        if e.code in (409, 422):
+            global _users_loaded
+            _users_loaded = False
+            _carica_users_da_github()
+    except Exception:
+        pass
+
+def _topic_di(testo):
+    """Determina la categoria di una domanda dalle TOPIC_KEYWORDS."""
+    t = (testo or "").lower()
+    for topic, kws in TOPIC_KEYWORDS.items():
+        if any(k in t for k in kws):
+            return topic
+    return "altro"
+
+def aggiorna_user(chat_id, canale, nome, testo, lingua=None, username=None):
+    """Aggiorna i metadati cumulativi del cliente. Best-effort, non blocca il bot."""
+    try:
+        _carica_users_da_github()
+        cid = str(chat_id)
+        ora_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        u = _users.get(cid) or {}
+        u.setdefault("canale", canale)
+        u.setdefault("primo_msg", ora_iso)
+        u.setdefault("totale_msg", 0)
+        u.setdefault("topic_count", {})
+        if nome:
+            u["nome"] = nome
+        if username:
+            u["username"] = username
+        if lingua:
+            u["lingua"] = lingua
+        u["ultimo_msg"] = ora_iso
+        u["totale_msg"] = int(u.get("totale_msg", 0)) + 1
+        topic = _topic_di(testo)
+        u["topic_count"][topic] = int(u["topic_count"].get(topic, 0)) + 1
+        _users[cid] = u
+        _salva_users_su_github()
+    except Exception:
+        pass
 
 
 # ── Frasi "non so rispondere" ─────────────────────────────────────────────────
@@ -1452,6 +1550,8 @@ def webhook():
                 lingua_stat = rileva_lingua(testo)
                 aggiorna_stats(testo, lingua_stat)
                 aggiorna_daily_stats(testo, lingua_stat, chat_id)
+                if not is_owner:
+                    aggiorna_user(chat_id, "telegram", nome, testo, lingua_stat, username)
             except Exception:
                 pass
         except Exception:
@@ -1824,6 +1924,12 @@ def whatsapp_webhook():
         info  = leggi_info()
         reply = chiedi_ai(testo, info, chat_id=wa_session_id)
         aggiorna_storia(wa_session_id, testo, reply)
+        # Aggiorna anagrafica utente (per dashboard)
+        try:
+            lingua_stat = rileva_lingua(testo)
+            aggiorna_user(wa_session_id, "whatsapp", nome, testo, lingua_stat, None)
+        except Exception:
+            pass
 
         # Invia risposta all'ospite su WhatsApp
         wa_invia(wa_from, reply)
