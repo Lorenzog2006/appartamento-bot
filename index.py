@@ -1001,10 +1001,19 @@ def _chiama_groq(model, messages, timeout):
 
 def _chiama_claude(system_text, messages_claude, timeout=35):
     url = "https://api.anthropic.com/v1/messages"
+    # Prompt caching: il system prompt (16KB di info appartamento) viene cachato
+    # da Anthropic per 5 minuti. Token "cached" costano 1/10 dei token normali.
+    # Risparmio tipico: 60-80% sui costi totali.
     payload = {
         "model": "claude-sonnet-4-6",
         "max_tokens": 1024,
-        "system": system_text,
+        "system": [
+            {
+                "type": "text",
+                "text": system_text,
+                "cache_control": {"type": "ephemeral"}
+            }
+        ],
         "messages": messages_claude
     }
     req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
@@ -1769,17 +1778,20 @@ def costi_claude_stimati(giorni=30):
                 msg_recenti += int(u.get("totale_msg", 0))
         except Exception:
             pass
-    # Stima Sonnet 4.6: input 5000 tok ($3/M) + output 500 tok ($15/M) = $0.022/msg ≈ €0.020
-    costo_msg_eur = 0.020
+    # Stima Sonnet 4.6 con prompt caching attivo:
+    # - Cache hit (~70% delle volte entro 5 min): 5000 tok × $0.30/M + 500 tok output × $15/M = $0.009
+    # - Cache miss (~30%): 5000 tok × $3.00/M + 500 tok × $15/M = $0.022
+    # Media ponderata: 0.7 × $0.009 + 0.3 × $0.022 = ~$0.013/msg ≈ €0.012
+    costo_msg_eur = 0.012
     return {
         "giorni": giorni,
         "messaggi_recenti": msg_recenti,
         "messaggi_lifetime": msg_lifetime,
         "costo_recenti_eur": round(msg_recenti * costo_msg_eur, 4),
         "costo_lifetime_eur": round(msg_lifetime * costo_msg_eur, 4),
-        "modello": "claude-sonnet-4-6",
+        "modello": "claude-sonnet-4-6 (con prompt caching)",
         "costo_per_msg": costo_msg_eur,
-        "nota": "Stima: ~5k tok input + 500 tok output per msg ($3 + $15 per 1M tok)"
+        "nota": "Stima con prompt caching attivo (~70% cache hit): system prompt cachato per 5 min, costa 1/10 dei token normali"
     }
 
 
