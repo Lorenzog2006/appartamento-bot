@@ -731,20 +731,26 @@ def invia_messaggio(chat_id, testo, parse_mode=None, remove_kb=True):
         payload["reply_markup"] = {"remove_keyboard": True}
     telegram("sendMessage", payload)
 
-def invia_bottoni(chat_id, testo, bottoni):
-    telegram("sendMessage", {
+def invia_bottoni(chat_id, testo, bottoni, parse_mode=None):
+    payload = {
         "chat_id": chat_id,
         "text": testo,
         "reply_markup": {"inline_keyboard": bottoni}
-    })
+    }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    telegram("sendMessage", payload)
 
-def modifica_messaggio(chat_id, message_id, testo):
+def modifica_messaggio(chat_id, message_id, testo, parse_mode=None):
     try:
-        telegram("editMessageText", {
+        payload = {
             "chat_id": chat_id,
             "message_id": message_id,
             "text": testo
-        })
+        }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        telegram("editMessageText", payload)
     except Exception:
         pass
 
@@ -1095,6 +1101,51 @@ def webhook():
                 _upload_media.pop(str(cb_chat_id), None)
                 modifica_messaggio(cb_chat_id, cb_msg_id, "✅ Ok, non salvato.")
 
+            # ── Cancellazione media: bottone 🗑️ N → conferma ──
+            elif cb_data.startswith("DEL_MEDIA:"):
+                indice = cb_data.split(":")[1]
+                # Trova il media #indice per mostrare anteprima
+                anteprima = ""
+                try:
+                    media_list = leggi_media()
+                    idx = int(indice) - 1
+                    if 0 <= idx < len(media_list):
+                        m = media_list[idx]
+                        icona = "🎬" if m["tipo"] == "video" else "📸"
+                        kw = ", ".join(m["keywords"][:5])
+                        anteprima = f"\n\n{icona} _{kw}_\n📝 {m.get('caption','')[:100]}"
+                except Exception:
+                    pass
+                invia_bottoni(cb_chat_id,
+                    f"⚠️ Sicuro di voler cancellare il media *#{indice}*?{anteprima}",
+                    [[
+                        {"text": f"✅ Sì, cancella #{indice}", "callback_data": f"DEL_MEDIA_OK:{indice}"},
+                        {"text": "❌ Annulla", "callback_data": "DEL_MEDIA_CANCEL"}
+                    ]],
+                    parse_mode="Markdown"
+                )
+
+            # ── Cancellazione media: conferma → esegui ──
+            elif cb_data.startswith("DEL_MEDIA_OK:"):
+                indice = int(cb_data.split(":")[1])
+                modifica_messaggio(cb_chat_id, cb_msg_id, f"⏳ Cancellazione media #{indice}...")
+                riga_rimossa = cancella_media_su_github(indice)
+                if riga_rimossa:
+                    anteprima = riga_rimossa[:120] + ("..." if len(riga_rimossa) > 120 else "")
+                    modifica_messaggio(cb_chat_id, cb_msg_id,
+                        f"✅ Media *#{indice}* cancellato!\n\n`{anteprima}`\n\n"
+                        f"Usa /listamedia per vedere la lista aggiornata.",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    modifica_messaggio(cb_chat_id, cb_msg_id,
+                        f"❌ Errore nella cancellazione del media #{indice}."
+                    )
+
+            # ── Cancellazione media: annulla ──
+            elif cb_data == "DEL_MEDIA_CANCEL":
+                modifica_messaggio(cb_chat_id, cb_msg_id, "✅ Annullato. Nessun media è stato cancellato.")
+
             return "ok"
 
         # ── Messaggi normali ────────────────────────────────────────────────
@@ -1282,7 +1333,7 @@ def webhook():
                 invia_messaggio(chat_id, f"Errore stats: {e}")
             return "ok"
 
-        # ── /listamedia ── elenca tutti i media salvati ──
+        # ── /listamedia ── elenca tutti i media con bottoni di cancellazione ──
         if testo == "/listamedia" and is_owner:
             try:
                 media_list = leggi_media()
@@ -1300,29 +1351,21 @@ def webhook():
                     if caption:
                         riga += f"\n   📝 {caption[:80]}{'...' if len(caption) > 80 else ''}"
                     righe.append(riga)
-                righe.append("\n💡 Per cancellare: `/cancellamedia N`")
-                invia_messaggio(chat_id, "\n\n".join(righe), parse_mode="Markdown")
+                righe.append("\n👇 *Tocca il numero per cancellare:*")
+                # Costruisci bottoni 🗑️ 1, 🗑️ 2, ... in righe di 4
+                bottoni = []
+                riga_btn = []
+                for i in range(1, len(media_list) + 1):
+                    riga_btn.append({"text": f"🗑️ {i}", "callback_data": f"DEL_MEDIA:{i}"})
+                    if len(riga_btn) == 4:
+                        bottoni.append(riga_btn)
+                        riga_btn = []
+                if riga_btn:
+                    bottoni.append(riga_btn)
+                bottoni.append([{"text": "❌ Chiudi", "callback_data": "DEL_MEDIA_CANCEL"}])
+                invia_bottoni(chat_id, "\n\n".join(righe), bottoni, parse_mode="Markdown")
             except Exception as e:
                 invia_messaggio(chat_id, f"❌ Errore: {e}")
-            return "ok"
-
-        # ── /cancellamedia N ── cancella il media #N ──
-        if testo.startswith("/cancellamedia") and is_owner:
-            parti = testo.split()
-            if len(parti) < 2 or not parti[1].isdigit():
-                invia_messaggio(chat_id,
-                    "❓ Uso: `/cancellamedia N`\nDove N è il numero che vedi con /listamedia",
-                    parse_mode="Markdown"
-                )
-                return "ok"
-            indice = int(parti[1])
-            invia_messaggio(chat_id, f"⏳ Cancellazione media #{indice} in corso...")
-            riga_rimossa = cancella_media_su_github(indice)
-            if riga_rimossa:
-                anteprima = riga_rimossa[:120] + ("..." if len(riga_rimossa) > 120 else "")
-                invia_messaggio(chat_id, f"✅ Media #{indice} cancellato!\n\n`{anteprima}`", parse_mode="Markdown")
-            else:
-                invia_messaggio(chat_id, f"❌ Non ho trovato il media #{indice}.\nUsa /listamedia per vedere i numeri validi.")
             return "ok"
 
         # ── /rispondi ──
