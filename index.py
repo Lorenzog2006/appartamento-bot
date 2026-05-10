@@ -219,6 +219,47 @@ def _topic_di(testo):
             return topic
     return "altro"
 
+def is_ospite_tornato(chat_id):
+    """True se questo cliente ha gia' scritto al bot in passato (>= 2 messaggi totali
+    e ultimo contatto piu' di 30 giorni fa)."""
+    try:
+        _carica_users_da_github()
+        u = _users.get(str(chat_id))
+        if not u:
+            return False
+        if int(u.get("totale_msg", 0)) < 2:
+            return False
+        try:
+            ultimo = datetime.strptime((u.get("ultimo_msg", "") or "")[:19], "%Y-%m-%dT%H:%M:%S")
+            giorni_passati = (datetime.now() - ultimo).days
+            # Almeno 30 giorni dall'ultimo contatto e flag bentornato non gia' inviato
+            return giorni_passati >= 30 and not u.get("bentornato_inviato")
+        except Exception:
+            return False
+    except Exception:
+        return False
+
+def marca_bentornato(chat_id):
+    """Segna che il messaggio di bentornato e' stato inviato."""
+    try:
+        _carica_users_da_github()
+        cid = str(chat_id)
+        if cid in _users:
+            _users[cid]["bentornato_inviato"] = True
+            _salva_users_su_github()
+    except Exception:
+        pass
+
+BENTORNATO = {
+    "italian":  "Bentornato {nome}! 😊 Felice di rivederti. Come posso aiutarti questa volta?",
+    "english":  "Welcome back {nome}! 😊 Happy to see you again. How can I help you this time?",
+    "french":   "Re-bonjour {nome}! 😊 Heureux de te revoir. Comment puis-je t'aider cette fois?",
+    "spanish":  "¡Bienvenido de nuevo {nome}! 😊 Encantado de verte otra vez. ¿En qué puedo ayudarte?",
+    "german":   "Willkommen zurück {nome}! 😊 Schön, dich wiederzusehen. Wie kann ich dir helfen?",
+    "portuguese":"Bem-vindo de volta {nome}! 😊 Feliz em te ver de novo. Como posso ajudar?",
+}
+
+
 def rileva_sentiment_negativo(testo):
     """Rileva se il testo dell'ospite mostra frustrazione/rabbia/insoddisfazione.
     Approccio keyword multilingua, conservativo per evitare falsi positivi."""
@@ -1680,6 +1721,17 @@ def webhook():
                 invia_messaggio(chat_id, ERRORE_DATE.get(lingua, ERRORE_DATE["english"]), remove_kb=True)
                 return "ok"
 
+        # ── Ospite tornato: saluto speciale (solo prima volta dopo lungo periodo) ──
+        if not is_owner and is_ospite_tornato(chat_id):
+            try:
+                lingua_t = rileva_lingua(testo)
+                msg_bt = BENTORNATO.get(lingua_t, BENTORNATO["english"]).format(nome=nome)
+                invia_messaggio(chat_id, msg_bt)
+                marca_bentornato(chat_id)
+            except Exception:
+                pass
+            # NON return: prosegui poi con la risposta AI normale
+
         # ── Pausa AI: notifica Lorenzo e basta, non rispondere ──
         if not is_owner and is_paused(chat_id):
             if OWNER_ID:
@@ -2832,6 +2884,16 @@ def whatsapp_webhook():
 
         # Chiave sessione WhatsApp separata da Telegram
         wa_session_id = f"wa_{wa_from}"
+
+        # Ospite tornato: saluto speciale prima della risposta
+        if is_ospite_tornato(wa_session_id):
+            try:
+                lingua_t = rileva_lingua(testo)
+                msg_bt = BENTORNATO.get(lingua_t, BENTORNATO["english"]).format(nome=nome)
+                wa_invia(wa_from, msg_bt)
+                marca_bentornato(wa_session_id)
+            except Exception:
+                pass
 
         # Pausa AI: notifica Lorenzo e basta, non rispondere
         if is_paused(wa_session_id):
