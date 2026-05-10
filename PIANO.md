@@ -331,6 +331,126 @@ Tempo cliente: **5-10 minuti**. Confronto: setup manuale che ho fatto io: **4 or
 | Trascrizione audio | Groq | whisper-large-v3-turbo (gratis tier) |
 | Riorganizzazione testo | Anthropic | claude-haiku-4-5 |
 
+### 6.2.1 Chi paga le API AI — modello commerciale
+
+**Decisione confermata: Shared API con quote per piano + opzione BYOK per Enterprise.**
+
+#### Shared API (default — 99% dei clienti)
+- Lorenzo ha **1 sola Anthropic API key master** (env var `ANTHROPIC_KEY_MASTER`)
+- Tutti i clienti la usano in modo trasparente
+- Lorenzo paga Anthropic la fattura totale mensile
+- Cliente paga Lorenzo 1 prezzo unico (€69/mese piano Pro) tutto incluso
+
+**Pro:**
+- Cliente onboarding super veloce (niente account Anthropic da creare)
+- 1 sola fattura per il cliente (tutto da te via Stripe)
+- Volume aggregato → sconti Anthropic sopra certi soglie
+- Tu controlli l'ottimizzazione (modello, caching, prompt) e ne benefici tutti
+
+**Contro:**
+- Tu anticipi i costi (paghi Anthropic, poi Stripe ti paga)
+- Cliente "estremo" (es. ostello con 100 ospiti) potrebbe consumare molto → mitigato da quote
+- Single point of failure se la key viene revocata → mitigato da chiave di backup
+
+#### BYOK — Bring Your Own Key (Enterprise only)
+- Cliente Enterprise apre il proprio account Anthropic
+- Inserisce la sua API key cifrata nella dashboard
+- Il bot usa la sua key per i suoi messaggi
+- Cliente paga Anthropic separatamente (utile per agenzie con volumi enormi che vogliono controllo fatturazione)
+
+**Quando offrirla:**
+- Solo piano **Enterprise** (€499+)
+- O su richiesta esplicita del cliente
+- Mai default
+
+#### Quote per piano
+
+Ogni piano ha una **quota mensile di messaggi inclusi**. Oltre la quota, costo extra per messaggio (overage). Questo protegge Lorenzo da clienti pesanti pur lasciando flessibilità.
+
+| Piano | Prezzo | Msg inclusi/mese | Costo extra | Costo AI stimato Lorenzo |
+|---|---|---|---|---|
+| Starter | €29 | 500 | €0,03/msg | ~€0,80 |
+| Pro ⭐ | €69 | 3.000 | €0,02/msg | ~€2,40 |
+| Business | €149 | 10.000 | €0,015/msg | ~€8 |
+| Enterprise | da €499 | 50.000+ | negoziato (o BYOK) | ~€40 |
+
+**Calcolo stima**: con prompt caching ~70% hit rate, costo medio per messaggio = **€0,0008** (€0,80 ogni 1.000 msg).
+
+#### Monitoraggio uso e overage
+
+In `tenants.json` per ogni tenant:
+```json
+"ai": {
+  "tipo": "shared",
+  "anthropic_key_byok": null,
+  "modello": "claude-haiku-4-5",
+  "msg_inclusi_mese": 3000,
+  "msg_consumati_mese_corrente": 1247,
+  "extra_per_msg_eur": 0.02,
+  "ultimo_reset": "2026-05-01T00:00:00",
+  "soft_limit_email_inviata": false,
+  "hard_limit_pausa_attiva": false
+}
+```
+
+**Logica:**
+- Ogni risposta AI → incrementa `msg_consumati_mese_corrente`
+- A **80%** → email automatica al cliente: "Stai consumando velocemente"
+- A **100%** → email: "Quota raggiunta, da ora ogni msg costa €0,02 extra"
+- A **150%** → email + opzione "passa al piano superiore con sconto"
+- Reset mensile alla scadenza dell'abbonamento Stripe
+
+**Hard limit (opzionale, configurabile dal cliente):**
+Se il cliente vuole evitare extra, può attivare "blocca a fine quota" → bot risponde "il proprietario sta valutando di aggiornare il servizio, ti contatterà a breve". Notifica anche Lorenzo per avvisare il cliente.
+
+#### Tracking dei token reali (vs stima attuale)
+
+Per accuratezza:
+- Modificare `_chiama_claude` per leggere `usage.input_tokens`, `usage.output_tokens`, `usage.cache_creation_input_tokens`, `usage.cache_read_input_tokens` dalla risposta API
+- Accumularli per tenant in `tenants/<id>/ai_usage.json`:
+  ```json
+  {
+    "2026-05": {
+      "richieste": 1247,
+      "input_tokens": 156000,
+      "output_tokens": 18500,
+      "cache_read": 102000,
+      "cache_creation": 54000,
+      "costo_eur_calcolato": 2.43
+    }
+  }
+  ```
+- Dashboard mostra costo reale, non stima
+
+Sforzo: ~1h di sviluppo (uno dei task di Fase 1).
+
+#### GDPR / Privacy
+
+Con modello Shared, i messaggi passano dalla key di Lorenzo. Vanno dichiarati chiaramente nei Termini di Servizio:
+
+> "I messaggi degli ospiti vengono elaborati da Anthropic Inc. (San Francisco, CA, USA) per generare le risposte automatiche. Anthropic non trattiene i dati per addestramento (politica di default). I dati sono criptati in transito (TLS 1.3) e non condivisi con terzi. Riferimenti: anthropic.com/privacy"
+
+**Azione**: richiedere a Anthropic il **DPA (Data Processing Agreement)** firmato — gratuito su richiesta, formalizza la conformità GDPR. Da fare prima di onboardare i primi clienti paganti.
+
+#### Backup e continuità servizio
+
+Per evitare che se la key Lorenzo viene revocata si fermano tutti i clienti:
+1. Avere **2 API key Anthropic separate** (account aziendale + account backup)
+2. Logica retry: se primary fails con 401/403, switch su backup
+3. Alert immediato a Lorenzo via Telegram se backup viene attivata
+4. Costo: zero (Anthropic non addebita per chiavi, solo per uso)
+
+#### Stima volumi a regime
+
+| Mese | Tenants | Msg/mese tot stimati | Costo AI mensile Lorenzo |
+|---|---|---|---|
+| 3 | 10 | ~30.000 | ~€24 |
+| 6 | 30 | ~90.000 | ~€72 |
+| 12 | 100 | ~300.000 | ~€240 |
+| 24 | 300 | ~900.000 | ~€720 |
+
+A volumi alti (300+ tenant) entrare in **Anthropic Volume Tier** che dà 10-15% sconto. Anche valutare **Anthropic Enterprise** con prezzi negoziati.
+
 ### 6.3 Pagamenti
 - **Stripe** per gestione abbonamenti
 - Webhook Stripe → aggiorna stato tenant in `tenants.json`
@@ -447,27 +567,55 @@ Migrazione da 360dialog a relazione diretta con Meta. Vedi §5.1 per dettagli.
 
 ### 8.1 Pricing piani
 
-| Piano | Prezzo/mese | Target | Limiti | Caratteristiche |
-|---|---|---|---|---|
-| **Starter** | €29 | Host singolo | 1 appartamento, 500 msg/mese | Solo Telegram OPPURE WhatsApp, 1 lingua, no audio |
-| **Pro** ⭐ | €69 | Host avanzato | 1 appartamento, msg illimitati | Telegram + WhatsApp, 5 lingue, audio, foto auto, dashboard |
-| **Business** | €149 | Property manager | Fino a 5 appartamenti | Tutto del Pro + sentiment alert + pausa AI + multi-property dashboard |
-| **Enterprise** | da €499 | Agenzie | Illimitato | White label, API, integrazioni PMS (Smoobu, Hostaway), SLA |
+| Piano | Prezzo/mese | Msg inclusi | Extra | Target | Caratteristiche |
+|---|---|---|---|---|---|
+| **Starter** | €29 | 500/mese | €0,03/msg | Host singolo | Solo Telegram OPPURE WhatsApp, 1 lingua, no audio |
+| **Pro** ⭐ | €69 | 3.000/mese | €0,02/msg | Host avanzato | Telegram + WhatsApp, 5 lingue, audio, foto auto, dashboard |
+| **Business** | €149 | 10.000/mese | €0,015/msg | Property manager | Fino a 5 appartamenti, sentiment alert, pausa AI, multi-property |
+| **Enterprise** | da €499 | 50.000+ o BYOK | negoziato | Agenzie | White label, API, integrazioni PMS, SLA, BYOK opzionale |
 
 **Trial gratuito 7 giorni** su tutti i piani. Sconto annuale -20%.
 
+**Nota AI**: nei piani Starter/Pro/Business il costo Claude API è incluso nel prezzo (modello shared). Il cliente NON deve creare account Anthropic. Vedi §6.2.1 per dettagli.
+
 ### 8.2 Costi marginali per cliente (piano Pro €69)
+
+Cliente medio: 1.500 msg/mese (sotto la quota 3.000 inclusa).
+
+| Voce | Costo/mese | Note |
+|---|---|---|
+| Claude Haiku API (shared, con cache) | ~€2,40 | 1.500 msg × €0,0008 stimato |
+| Groq Whisper (audio) | €0,00 | Free tier 14.400 req/giorno |
+| Vercel + GitHub storage | ~€0,30 | A regime, ammortizzato su 100+ tenant |
+| 360dialog | €49,00 | BSP fee per numero WhatsApp |
+| Stripe fee | ~€1,30 | 1,5% + €0,25 fissi su €69 |
+| Email transazionali (Resend) | ~€0,10 | ~10 email/mese per cliente |
+| **Totale costo per cliente** | **~€53,10** | |
+| **Margine per cliente** | **€15,90 (23%)** | |
+
+**Cliente "estremo"** (5.000 msg/mese, 2.000 sopra quota Pro):
+- Cliente paga: €69 + (2.000 × €0,02) = €109
+- Costo Claude: 5.000 × €0,0008 = €4
+- Costo totale: €54,80
+- Margine: €54,20 (50%)
+
+→ I clienti pesanti sono **più redditizi** dei clienti medi grazie all'overage.
+
+### 8.2.1 Anno 2 dopo migrazione Tech Provider
+
+Stessa cliente Pro, ma senza 360dialog:
 
 | Voce | Costo/mese |
 |---|---|
-| Claude Haiku API (con cache) | ~€0,80 |
-| Groq Whisper (audio) | €0,00 (free tier) |
-| Vercel + GitHub | ~€0,30 (a regime, ammortizzato) |
-| 360dialog | €49,00 |
-| Stripe (1.5% + €0.25) | ~€1,30 |
-| Email (Resend) | ~€0,10 |
-| **Totale costo** | **~€51,50** |
-| **Margine** | **€17,50 (25%)** |
+| Claude Haiku API | ~€2,40 |
+| Meta Cloud API (Tech Provider direct) | ~€0,50 (Meta fattura cost di volume) |
+| Vercel + GitHub | ~€0,30 |
+| Stripe | ~€1,30 |
+| Email | ~€0,10 |
+| **Totale costo** | **~€4,60** |
+| **Margine** | **€64,40 (93%)** |
+
+→ La migrazione Tech Provider porta il margine **da 23% a 93%**. È IL punto strategico per scalare oltre i 100 clienti.
 
 ### 8.3 Proiezione ricavi 24 mesi
 
