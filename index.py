@@ -4,11 +4,11 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-TOKEN          = os.environ.get("TELEGRAM_TOKEN")
-GROQ_KEY       = os.environ.get("GROQ_API_KEY")
-ANTHROPIC_KEY  = os.environ.get("ANTHROPIC_KEY")
-OWNER_ID       = os.environ.get("OWNER_CHAT_ID")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+TOKEN          = (os.environ.get("TELEGRAM_TOKEN") or "").strip()
+GROQ_KEY       = (os.environ.get("GROQ_API_KEY") or "").strip()
+ANTHROPIC_KEY  = (os.environ.get("ANTHROPIC_KEY") or "").strip()
+OWNER_ID       = (os.environ.get("OWNER_CHAT_ID") or "").strip()
+GITHUB_TOKEN   = (os.environ.get("GITHUB_TOKEN") or "").strip()
 
 WA_TOKEN        = (os.environ.get("WHATSAPP_TOKEN") or "").strip()
 WA_PHONE_ID     = (os.environ.get("WHATSAPP_PHONE_ID") or "").strip()
