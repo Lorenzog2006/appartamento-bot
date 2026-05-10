@@ -219,6 +219,49 @@ def _topic_di(testo):
             return topic
     return "altro"
 
+def rileva_sentiment_negativo(testo):
+    """Rileva se il testo dell'ospite mostra frustrazione/rabbia/insoddisfazione.
+    Approccio keyword multilingua, conservativo per evitare falsi positivi."""
+    if not testo:
+        return False
+    t = " " + testo.lower() + " "
+    # Frasi/parole che indicano chiaramente frustrazione o rabbia
+    indicatori = [
+        # Italiano
+        "schifo", "vergogna", "scandalo", "inaccettabile", "rimborso",
+        "non funziona niente", "tutto rotto", "tutto sporco", "disgustoso",
+        "deluso", "delusa", "delusione", "arrabbiato", "arrabbiata", "incazzat",
+        "pessimo", "pessima", "orribile", "terribile", "disastro",
+        "voglio andare via", "voglio andarmene", "me ne vado", "rivoglio i soldi",
+        "denuncio", "denuncia", "avvocato", "tribunale", "polizia",
+        "ridicolo", "vergognoso", "che cavolo", "ma cosa",
+        # English
+        " awful ", " terrible ", " disgusting ", " horrible ", " disaster ",
+        " refund ", " unacceptable ", " ridiculous ",
+        " disappointed ", " disappointing ", " angry ",
+        "want to leave", "want my money back", "this is a joke",
+        "i'll sue", "calling the police", "small claims",
+        # French
+        "honteux", "scandaleux", "inacceptable", "remboursement",
+        "déçu", "déçue", "dégoûtant", "horrible", "catastrophe",
+        "je porte plainte", "avocat", "tribunal",
+        # Spanish
+        "vergüenza", "escándalo", "inaceptable", "reembolso", "asco",
+        "decepcionad", "horrible", "pésimo",
+        # German
+        "katastrophe", "skandal", "unzumutbar", "erstattung",
+        "enttäuscht", "ekelhaft", "schrecklich",
+    ]
+    for ind in indicatori:
+        if ind in t:
+            return True
+    # Controllo anche pattern "molto/troppo + parola negativa"
+    if re.search(r'\b(molto|troppo|veramente|davvero)\s+(brutto|brutta|sporco|sporca|rotto|rotta|caldo|freddo|rumoros)', t):
+        return True
+    if re.search(r'\b(very|too|really)\s+(bad|dirty|broken|noisy|hot|cold)', t):
+        return True
+    return False
+
 def is_paused(chat_id):
     """True se la AI e' in pausa per questo cliente."""
     try:
@@ -1705,6 +1748,7 @@ def webhook():
         ]
         t_lower = testo.lower()
         e_insoddisfatto = any(p in t_lower for p in PAROLE_NEGATIVE) and not e_emergenza
+        e_arrabbiato = rileva_sentiment_negativo(testo) and not e_emergenza
 
         # ── Notifica proprietario ──
         if OWNER_ID and not is_owner:
@@ -1717,13 +1761,25 @@ def webhook():
                         f"❓ {testo}\n\n🤖 {reply}\n\n"
                         f"⚡ Rispondi subito all'ospite premendo Rispondi."
                     )
+                elif e_arrabbiato:
+                    invia_bottoni(int(OWNER_ID),
+                        f"🚨 *ATTENZIONE — OSPITE ARRABBIATO*\n\n"
+                        f"Tono frustrato/aggressivo rilevato.\n\n"
+                        f"Ospite: {nome_display} [ID:{chat_id}]\n\n"
+                        f"❓ _{testo}_\n\n"
+                        f"🤖 {reply}\n\n"
+                        f"💡 Suggerimento: rispondi tu di persona. Premi *Rispondi* o usa /pausa.",
+                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]],
+                        parse_mode="Markdown"
+                    )
                 elif e_insoddisfatto:
-                    invia_messaggio(int(OWNER_ID),
+                    invia_bottoni(int(OWNER_ID),
                         f"😤 OSPITE INSODDISFATTO\n\n"
                         f"Ospite: {nome_display} [ID:{chat_id}]\n\n"
                         f"❓ {testo}\n\n"
                         f"🤖 {reply}\n\n"
-                        f"👆 Premi Rispondi per contattarlo direttamente."
+                        f"👆 Premi Rispondi per contattarlo direttamente.",
+                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]]
                     )
                 else:
                     invia_bottoni(int(OWNER_ID),
@@ -2832,11 +2888,25 @@ def whatsapp_webhook():
         # Notifica Lorenzo su Telegram (con [WA:...] per permettere reply diretto)
         if OWNER_ID:
             try:
-                invia_bottoni(int(OWNER_ID),
-                    f"📱 *WhatsApp* — {nome}\n\n❓ {testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]",
-                    [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}]],
-                    parse_mode="Markdown"
-                )
+                wa_arrabbiato = rileva_sentiment_negativo(testo)
+                if wa_arrabbiato:
+                    invia_bottoni(int(OWNER_ID),
+                        f"🚨 *ATTENZIONE — OSPITE WHATSAPP ARRABBIATO*\n\n"
+                        f"Tono frustrato/aggressivo rilevato.\n\n"
+                        f"Ospite: {nome}\n\n"
+                        f"❓ _{testo}_\n\n"
+                        f"🤖 {reply}\n\n"
+                        f"💡 Rispondi tu in reply o usa /pausa wa_{wa_from}\n\n"
+                        f"[WA:{wa_from}]",
+                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}]],
+                        parse_mode="Markdown"
+                    )
+                else:
+                    invia_bottoni(int(OWNER_ID),
+                        f"📱 *WhatsApp* — {nome}\n\n❓ {testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]",
+                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}]],
+                        parse_mode="Markdown"
+                    )
             except Exception:
                 pass
 
