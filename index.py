@@ -2096,6 +2096,8 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .cost-row .nt{font-size:11.5px;color:var(--txt-mute);margin-top:3px}
 .cost-row .pr{font-size:18px;font-weight:700;color:#fff;flex-shrink:0;text-align:right;min-width:80px}
 .cost-row .pr.zero{color:var(--accent)}
+.cost-link{display:inline-block;margin-top:6px;font-size:11.5px;color:#5aa3ff;text-decoration:none;background:rgba(90,163,255,.12);padding:4px 8px;border-radius:8px;font-weight:500}
+.cost-link:active{background:rgba(90,163,255,.2)}
 .costi-note{background:rgba(255,255,255,.04);border-radius:14px;padding:14px;font-size:12px;line-height:1.55;color:var(--txt-mute)}
 .cat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:6px;font-size:13px}
 .cat-row .free{color:var(--accent);font-weight:600}
@@ -2366,21 +2368,36 @@ function renderCosti(){
   // Totale grande
   document.getElementById('costiTotale').innerHTML=
     `<div class="costi-tot"><div class="v">${fmtEur(COSTI.totale_eur||0)}</div><div class="l">Totale stimato — ultimi ${COSTI.periodo_giorni} giorni</div></div>`;
-  // Lista servizi
+  // Lista servizi (con link diretti per costi reali)
   const m=COSTI.meta||{}, c=COSTI.claude||{};
   const servizi=[
-    ['📱','WhatsApp Cloud API (Meta)', m.errore?'⚠️ '+m.errore:`${m.totale_conv||0} conversazioni totali`, m.costo_eur||0],
-    ['🤖','Claude API (Anthropic)', `~${c.messaggi_recenti||0} msg · ${c.modello||''}`, c.costo_recenti_eur||0],
-    ['🆓','Groq (fallback)', (COSTI.groq||{}).nota||'', 0],
-    ['💬','Telegram Bot API', (COSTI.telegram||{}).nota||'', 0],
-    ['💾','GitHub (storage dati)', (COSTI.github||{}).nota||'', 0],
-    ['☁️','Vercel (hosting)', (COSTI.vercel||{}).nota||'', 0]
+    {ic:'📱', nm:'WhatsApp Cloud API (Meta)',
+     nt:m.errore?'⚠️ '+m.errore:`${m.totale_conv||0} conversazioni totali`,
+     pr:m.costo_eur||0,
+     link:'https://business.facebook.com/wa/manage/insights/?asset_id=1476202720613528',
+     linkLbl:'Apri WhatsApp Manager'},
+    {ic:'🤖', nm:'Claude API (Anthropic)',
+     nt:`~${c.messaggi_recenti||0} msg · ${c.modello||''}`,
+     pr:c.costo_recenti_eur||0,
+     link:'https://console.anthropic.com/settings/usage',
+     linkLbl:'Apri Console Anthropic'},
+    {ic:'🆓', nm:'Groq (fallback)', nt:(COSTI.groq||{}).nota||'', pr:0,
+     link:'https://console.groq.com/usage', linkLbl:'Apri console Groq'},
+    {ic:'💬', nm:'Telegram Bot API', nt:(COSTI.telegram||{}).nota||'', pr:0},
+    {ic:'💾', nm:'GitHub (storage dati)', nt:(COSTI.github||{}).nota||'', pr:0,
+     link:'https://github.com/settings/billing', linkLbl:'Apri billing GitHub'},
+    {ic:'☁️', nm:'Vercel (hosting)', nt:(COSTI.vercel||{}).nota||'', pr:0,
+     link:'https://vercel.com/lorenzog2006s-projects/appartamento-bot/usage', linkLbl:'Apri usage Vercel'}
   ];
-  document.getElementById('costiList').innerHTML=servizi.map(([i,n,nt,p])=>
+  document.getElementById('costiList').innerHTML=servizi.map(s=>
     `<div class="cost-row">
-      <div class="ic">${i}</div>
-      <div class="info"><div class="nm">${escapeHtml(n)}</div><div class="nt">${escapeHtml(nt)}</div></div>
-      <div class="pr ${p===0?'zero':''}">${fmtEur(p)}</div>
+      <div class="ic">${s.ic}</div>
+      <div class="info">
+        <div class="nm">${escapeHtml(s.nm)}</div>
+        <div class="nt">${escapeHtml(s.nt)}</div>
+        ${s.link?`<a class="cost-link" href="${s.link}" target="_blank" rel="noopener">🔗 ${escapeHtml(s.linkLbl)} →</a>`:''}
+      </div>
+      <div class="pr ${s.pr===0?'zero':''}">${fmtEur(s.pr)}</div>
     </div>`).join('');
   // Categorie WhatsApp
   const cats=m.conv_per_categoria||{};
