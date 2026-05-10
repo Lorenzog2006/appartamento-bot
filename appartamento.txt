@@ -240,7 +240,8 @@ Disponibile foto con parole chiave: ingresso, entrance, entrée, entrada, eingan
 Disponibile foto con parole chiave: porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements — descrizione: Questa la porta di ingresso dell’appartamento
 # Aggiunto il 01/05/2026
 Disponibile foto con parole chiave: keybox, keybox, boite a cle, caja de llaves, schluesselkasten — descrizione: Qui dove si trova la keybox
-
+# Aggiunto il 10/05/2026
+Dove trovo la scopa: La trovi sul terrazzo uscendo sul lato destro
 
 [MEDIA]
 keybox, keybox, boite a cle, caja de llaves, schluesselkasten = photo:AgACAgIAAxkBAAIC02n1CRzqGtbDUMFiJRzJNgWch3TsAALNFmsb-gOpS0bdN-CXWrsgAQADAgADeQADOwQ | Qui dove si trova la keybox
