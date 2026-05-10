@@ -254,6 +254,8 @@ Una volta parcheggiato come faccio a raggiungere l’appartamento: La porta per 
 Una volta parcheggiato come faccio a raggiungere l’appartamento: La porta per salire la trovi di fronte al parcheggio
 # Aggiunto il 10/05/2026
 Dove si trova l’ascensore?: Lo trovi di fronte al posto auto porta grigia
+# Aggiunto il 10/05/2026
+Dove si trova l’ascensore?: Lo trovi di fronte al posto auto porta grigia
 
 [MEDIA]
 keybox, keybox, boite a cle, caja de llaves, schluesselkasten = photo:AgACAgIAAxkBAAIC02n1CRzqGtbDUMFiJRzJNgWch3TsAALNFmsb-gOpS0bdN-CXWrsgAQADAgADeQADOwQ | Qui dove si trova la keybox
