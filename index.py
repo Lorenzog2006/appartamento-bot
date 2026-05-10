@@ -839,7 +839,7 @@ def _chiama_groq(model, messages, timeout):
 def _chiama_claude(system_text, messages_claude, timeout=35):
     url = "https://api.anthropic.com/v1/messages"
     payload = {
-        "model": "claude-haiku-4-5",
+        "model": "claude-sonnet-4-6",
         "max_tokens": 1024,
         "system": system_text,
         "messages": messages_claude
@@ -1487,6 +1487,95 @@ def wa_invia(to, testo):
             pass
 
 
+# Cache: telegram_file_id → wa_media_id (validi per molte ore lato Meta)
+_wa_media_cache = {}
+
+def _telegram_file_url(file_id):
+    """Risolve un Telegram file_id in URL HTTPS scaricabile."""
+    r = telegram("getFile", {"file_id": file_id})
+    file_path = r.get("result", {}).get("file_path")
+    if not file_path:
+        return None
+    return f"https://api.telegram.org/file/bot{TOKEN}/{file_path}"
+
+def _wa_upload_media(file_id, tipo):
+    """Scarica un file da Telegram e lo carica su WhatsApp Cloud API. Ritorna media_id."""
+    if file_id in _wa_media_cache:
+        return _wa_media_cache[file_id]
+    # 1. Scarica da Telegram
+    url = _telegram_file_url(file_id)
+    if not url:
+        return None
+    file_data = urllib.request.urlopen(url, timeout=15).read()
+    # 2. Determina mime e estensione
+    if tipo == "video":
+        mime = "video/mp4"
+        filename = "video.mp4"
+    else:
+        # Probiamo a capire dall'URL (ext jpg/png/webp)
+        if url.lower().endswith(".png"):
+            mime, filename = "image/png", "photo.png"
+        elif url.lower().endswith(".webp"):
+            mime, filename = "image/webp", "photo.webp"
+        else:
+            mime, filename = "image/jpeg", "photo.jpg"
+    # 3. Multipart upload su Meta
+    boundary = "----WAUpload" + str(int(datetime.now().timestamp()))
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="messaging_product"\r\n\r\n'
+        f"whatsapp\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="type"\r\n\r\n'
+        f"{mime}\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: {mime}\r\n\r\n"
+    ).encode("utf-8") + file_data + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    req = urllib.request.Request(
+        f"https://graph.facebook.com/v18.0/{WA_PHONE_ID}/media",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {WA_TOKEN}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}"
+        }
+    )
+    r = urllib.request.urlopen(req, timeout=30)
+    media_id = json.loads(r.read()).get("id")
+    if media_id:
+        _wa_media_cache[file_id] = media_id
+    return media_id
+
+def wa_invia_media(to, telegram_file_id, tipo, caption=""):
+    """Invia foto/video via WhatsApp partendo da un file_id di Telegram."""
+    try:
+        media_id = _wa_upload_media(telegram_file_id, tipo)
+        if not media_id:
+            return False
+        wa_type = "video" if tipo == "video" else "image"
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": wa_type,
+            wa_type: {"id": media_id}
+        }
+        if caption:
+            payload[wa_type]["caption"] = caption
+        url = f"https://graph.facebook.com/v18.0/{WA_PHONE_ID}/messages"
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {WA_TOKEN}"
+        })
+        urllib.request.urlopen(req, timeout=15)
+        return True
+    except Exception as e:
+        try:
+            log_errore("wa_media", e)
+        except Exception:
+            pass
+        return False
+
+
 # ── WhatsApp webhook ──────────────────────────────────────────────────────────
 @app.route("/whatsapp", methods=["GET", "POST"])
 def whatsapp_webhook():
@@ -1550,6 +1639,17 @@ def whatsapp_webhook():
 
         # Invia risposta all'ospite su WhatsApp
         wa_invia(wa_from, reply)
+
+        # Media automatici (foto/video) — stessa logica di Telegram
+        try:
+            media = trova_media(testo)
+            if media:
+                wa_invia_media(wa_from, media["file_id"], media["tipo"], media.get("caption", ""))
+        except Exception as e:
+            try:
+                log_errore("wa_media_trigger", e)
+            except Exception:
+                pass
 
         # Notifica Lorenzo su Telegram
         if OWNER_ID:
