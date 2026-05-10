@@ -1,13 +1,13 @@
 {
-  "totale": 100,
+  "totale": 101,
   "lingue": {
-    "italian": 83,
+    "italian": 84,
     "english": 8,
     "french": 9
   },
   "argomenti": {
     "parcheggio": 11,
-    "altro": 48,
+    "altro": 49,
     "lavatrice": 1,
     "ristorante": 4,
     "spiaggia": 9,
