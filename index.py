@@ -1005,7 +1005,7 @@ def _chiama_claude(system_text, messages_claude, timeout=35):
     # da Anthropic per 5 minuti. Token "cached" costano 1/10 dei token normali.
     # Risparmio tipico: 60-80% sui costi totali.
     payload = {
-        "model": "claude-sonnet-4-6",
+        "model": "claude-haiku-4-5",
         "max_tokens": 1024,
         "system": [
             {
@@ -1778,20 +1778,20 @@ def costi_claude_stimati(giorni=30):
                 msg_recenti += int(u.get("totale_msg", 0))
         except Exception:
             pass
-    # Stima Sonnet 4.6 con prompt caching attivo:
-    # - Cache hit (~70% delle volte entro 5 min): 5000 tok × $0.30/M + 500 tok output × $15/M = $0.009
-    # - Cache miss (~30%): 5000 tok × $3.00/M + 500 tok × $15/M = $0.022
-    # Media ponderata: 0.7 × $0.009 + 0.3 × $0.022 = ~$0.013/msg ≈ €0.012
-    costo_msg_eur = 0.012
+    # Stima Haiku 4.5 con prompt caching attivo:
+    # - Cache hit (~70%): 5000 tok × $0.10/M + 500 tok × $5/M = $0.003
+    # - Cache miss (~30%): 5000 tok × $1.00/M + 500 tok × $5/M = $0.0075
+    # Media ponderata: 0.7 × $0.003 + 0.3 × $0.0075 = ~$0.0044/msg ≈ €0.004
+    costo_msg_eur = 0.004
     return {
         "giorni": giorni,
         "messaggi_recenti": msg_recenti,
         "messaggi_lifetime": msg_lifetime,
         "costo_recenti_eur": round(msg_recenti * costo_msg_eur, 4),
         "costo_lifetime_eur": round(msg_lifetime * costo_msg_eur, 4),
-        "modello": "claude-sonnet-4-6 (con prompt caching)",
+        "modello": "claude-haiku-4-5 (con prompt caching)",
         "costo_per_msg": costo_msg_eur,
-        "nota": "Stima con prompt caching attivo (~70% cache hit): system prompt cachato per 5 min, costa 1/10 dei token normali"
+        "nota": "Stima Haiku 4.5 con caching: system prompt cachato per 5 min ($0.10/M invece di $1/M)"
     }
 
 
