@@ -1,5 +1,5 @@
 from flask import Flask, request
-import json, os, re, base64, urllib.request
+import json, os, re, base64, urllib.request, urllib.error
 from datetime import datetime
 
 app = Flask(__name__)
@@ -20,11 +20,14 @@ GITHUB_API   = f"https://api.github.com/repos/{REPO}/contents/appartamento.txt"
 STATS_API       = f"https://api.github.com/repos/{REPO}/contents/stats.json"
 DAILY_STATS_API = f"https://api.github.com/repos/{REPO}/contents/daily_stats.json"
 BOOKINGS_API    = f"https://api.github.com/repos/{REPO}/contents/bookings.json"
+CONVERSATIONS_API = f"https://api.github.com/repos/{REPO}/contents/conversations.json"
 INFO_PATH    = os.path.join(os.path.dirname(__file__), "appartamento.txt")
 
 # ── Stato sessioni ────────────────────────────────────────────────────────────
 # chat_id → {"storia": [...], "ultimo": timestamp}
 _conversazioni = {}
+_conv_sha = None         # SHA del file conversations.json su GitHub
+_conv_loaded = False     # True dopo primo caricamento da GitHub
 MAX_MESSAGGI   = 10
 SCADENZA_ORE   = 2
 
@@ -35,25 +38,114 @@ _attesa_correzione_owner = {}
 # Flusso guidato upload media: OWNER_ID → {file_id, tipo, step, keywords}
 _upload_media = {}
 
+def _carica_conversazioni_da_github():
+    """Carica conversazioni da GitHub. Best-effort, mai bloccante."""
+    global _conversazioni, _conv_sha, _conv_loaded
+    if _conv_loaded or not GITHUB_TOKEN:
+        _conv_loaded = True
+        return
+    try:
+        url = f"{CONVERSATIONS_API}?t={int(datetime.now().timestamp())}"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=4)
+        data = json.loads(r.read())
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        loaded = json.loads(contenuto) if contenuto.strip() else {}
+        # Ripulisci conversazioni scadute (>SCADENZA_ORE)
+        ora = datetime.now().timestamp()
+        _conversazioni = {
+            cid: c for cid, c in loaded.items()
+            if (ora - c.get("ultimo", 0)) <= SCADENZA_ORE * 3600
+        }
+        _conv_sha = data["sha"]
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            # File non esiste ancora: ok, lo creeremo al primo salvataggio
+            _conversazioni = {}
+            _conv_sha = None
+        else:
+            try:
+                log_errore("conv_load", e)
+            except Exception:
+                pass
+    except Exception as e:
+        try:
+            log_errore("conv_load", e)
+        except Exception:
+            pass
+    finally:
+        _conv_loaded = True
+
+def _salva_conversazioni_su_github():
+    """Salva le conversazioni su GitHub. Best-effort, mai bloccante."""
+    global _conv_sha
+    if not GITHUB_TOKEN:
+        return
+    try:
+        contenuto_nuovo = json.dumps(_conversazioni, ensure_ascii=False)
+        payload = {
+            "message": "Aggiorna conversazioni",
+            "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+        }
+        if _conv_sha:
+            payload["sha"] = _conv_sha
+        req = urllib.request.Request(CONVERSATIONS_API, data=json.dumps(payload).encode(), headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        }, method="PUT")
+        r = urllib.request.urlopen(req, timeout=8)
+        risposta = json.loads(r.read())
+        _conv_sha = risposta.get("content", {}).get("sha", _conv_sha)
+    except urllib.error.HTTPError as e:
+        # Conflitto SHA (409): ricarica e riprova una volta
+        if e.code in (409, 422):
+            try:
+                global _conv_loaded
+                _conv_loaded = False
+                _carica_conversazioni_da_github()
+            except Exception:
+                pass
+        else:
+            try:
+                log_errore("conv_save", e)
+            except Exception:
+                pass
+    except Exception as e:
+        try:
+            log_errore("conv_save", e)
+        except Exception:
+            pass
+
 def get_storia(chat_id):
+    _carica_conversazioni_da_github()
     ora = datetime.now().timestamp()
-    conv = _conversazioni.get(chat_id)
+    conv = _conversazioni.get(str(chat_id)) or _conversazioni.get(chat_id)
     if conv and (ora - conv["ultimo"]) > SCADENZA_ORE * 3600:
-        del _conversazioni[chat_id]
+        _conversazioni.pop(str(chat_id), None)
+        _conversazioni.pop(chat_id, None)
         conv = None
     return conv["storia"] if conv else []
 
 def aggiorna_storia(chat_id, domanda, risposta):
+    _carica_conversazioni_da_github()
     ora = datetime.now().timestamp()
-    if chat_id not in _conversazioni:
-        _conversazioni[chat_id] = {"storia": [], "ultimo": ora}
-    storia = _conversazioni[chat_id]["storia"]
+    cid = str(chat_id)
+    if cid not in _conversazioni:
+        _conversazioni[cid] = {"storia": [], "ultimo": ora}
+    storia = _conversazioni[cid]["storia"]
     storia.append({"role": "user",      "content": domanda})
     storia.append({"role": "assistant", "content": risposta})
     if len(storia) > MAX_MESSAGGI * 2:
         storia = storia[-(MAX_MESSAGGI * 2):]
-    _conversazioni[chat_id]["storia"] = storia
-    _conversazioni[chat_id]["ultimo"] = ora
+    _conversazioni[cid]["storia"] = storia
+    _conversazioni[cid]["ultimo"] = ora
+    _salva_conversazioni_su_github()
 
 
 # ── Frasi "non so rispondere" ─────────────────────────────────────────────────
@@ -175,6 +267,19 @@ def leggi_testo():
 
 def invalida_cache():
     _cache["ts"] = 0
+
+def log_errore(contesto, errore):
+    """Notifica Lorenzo via Telegram di un errore. Best-effort, mai bloccante."""
+    if not OWNER_ID or not TOKEN:
+        return
+    try:
+        msg = f"⚠️ Bot errore [{contesto}]: {type(errore).__name__}: {str(errore)[:300]}"
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        data = json.dumps({"chat_id": int(OWNER_ID), "text": msg}).encode()
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 def leggi_info():
     testo = leggi_testo()
@@ -731,35 +836,57 @@ def _chiama_groq(model, messages, timeout):
     r = urllib.request.urlopen(req, timeout=timeout)
     return json.loads(r.read())["choices"][0]["message"]["content"]
 
+def _chiama_claude(system_text, messages_claude, timeout=35):
+    url = "https://api.anthropic.com/v1/messages"
+    payload = {
+        "model": "claude-haiku-4-5",
+        "max_tokens": 1024,
+        "system": system_text,
+        "messages": messages_claude
+    }
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01"
+    })
+    r = urllib.request.urlopen(req, timeout=timeout)
+    return json.loads(r.read())["content"][0]["text"]
+
 def chiedi_ai(domanda, info, chat_id=None):
     lingua = rileva_lingua(domanda)
-    system_text = SYSTEM_PROMPT.get(lingua, SYSTEM_PROMPT["english"]).format(info=info[:12000])
+    system_text = SYSTEM_PROMPT.get(lingua, SYSTEM_PROMPT["english"]).format(info=info[:24000])
     storia = get_storia(chat_id) if chat_id else []
     # Converti storia in formato Anthropic (no "system" nei messages)
     messages_claude = []
     for m in storia:
         messages_claude.append({"role": m["role"], "content": m["content"]})
     messages_claude.append({"role": "user", "content": domanda})
+    # 1° tentativo Claude (35s)
     try:
-        # Claude Haiku 3.5 — prima scelta
-        url = "https://api.anthropic.com/v1/messages"
-        payload = {
-            "model": "claude-haiku-4-5",
-            "max_tokens": 1024,
-            "system": system_text,
-            "messages": messages_claude
-        }
-        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
-            "Content-Type": "application/json",
-            "x-api-key": ANTHROPIC_KEY,
-            "anthropic-version": "2023-06-01"
-        })
-        r = urllib.request.urlopen(req, timeout=20)
-        return json.loads(r.read())["content"][0]["text"]
-    except Exception:
-        # Fallback Groq se Claude non risponde
+        return _chiama_claude(system_text, messages_claude, timeout=35)
+    except Exception as e1:
+        try:
+            log_errore("claude_1", e1)
+        except Exception:
+            pass
+    # 2° tentativo Claude (retry, 35s)
+    try:
+        return _chiama_claude(system_text, messages_claude, timeout=35)
+    except Exception as e2:
+        try:
+            log_errore("claude_2", e2)
+        except Exception:
+            pass
+    # Fallback Groq con modello più potente (70b invece di 8b)
+    try:
         messages_groq = [{"role": "system", "content": system_text}, *storia, {"role": "user", "content": domanda}]
-        return _chiama_groq("llama-3.1-8b-instant", messages_groq, timeout=10)
+        return _chiama_groq("llama-3.3-70b-versatile", messages_groq, timeout=20)
+    except Exception as e3:
+        try:
+            log_errore("groq", e3)
+        except Exception:
+            pass
+        return "Mi dispiace, sto avendo un problema tecnico in questo momento 🙏 Riprova tra qualche minuto, intanto avviso Lorenzo!"
 
 def bot_non_sa(risposta):
     return any(f in risposta.lower() for f in FRASI_NON_SO)
