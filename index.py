@@ -1101,7 +1101,33 @@ def webhook():
         # ── Proprietario risponde a notifica → inoltra all'ospite ──
         if is_owner and message.get("reply_to_message"):
             testo_originale = message["reply_to_message"].get("text", "")
+            # Cerca prima [WA:numero] (ospite WhatsApp), poi [ID:numero] (ospite Telegram)
+            match_wa = re.search(r'\[WA:(\d+)\]', testo_originale)
             match_id = re.search(r'\[ID:(\d+)\]', testo_originale)
+            if match_wa:
+                wa_numero = match_wa.group(1)
+                # Inoltra a WhatsApp via Cloud API
+                wa_invia(wa_numero, f"💬 {testo}")
+                # Aggiorna anche la storia conversazione lato bot
+                try:
+                    aggiorna_storia(f"wa_{wa_numero}", "[Risposta diretta di Lorenzo]", testo)
+                except Exception:
+                    pass
+                invia_messaggio(chat_id, f"✅ Risposta inviata su WhatsApp a +{wa_numero}!")
+                # Offri di salvare in memoria
+                match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
+                if not match_domanda:
+                    match_domanda = re.search(r'❓ (.+?)(?:\n|$)', testo_originale)
+                if match_domanda:
+                    domanda_originale = match_domanda.group(1).strip()
+                    invia_bottoni(chat_id,
+                        f"💾 Vuoi salvare questa risposta nella memoria del bot?\n\nD: {domanda_originale}\nR: {testo}",
+                        [[
+                            {"text": "✅ Sì, salva", "callback_data": "SALVA"},
+                            {"text": "❌ No",         "callback_data": "NO"}
+                        ]]
+                    )
+                return "ok"
             if match_id:
                 id_ospite = int(match_id.group(1))
                 invia_messaggio(id_ospite, f"💬 {testo}")
@@ -1651,11 +1677,11 @@ def whatsapp_webhook():
             except Exception:
                 pass
 
-        # Notifica Lorenzo su Telegram
+        # Notifica Lorenzo su Telegram (con [WA:...] per permettere reply diretto)
         if OWNER_ID:
             try:
                 invia_messaggio(int(OWNER_ID),
-                    f"📱 *WhatsApp* — {nome}\n\n❓ {testo}\n\n🤖 {reply}"
+                    f"📱 *WhatsApp* — {nome}\n\n❓ {testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]"
                 )
             except Exception:
                 pass
@@ -1672,7 +1698,7 @@ def whatsapp_webhook():
                 invia_messaggio(int(OWNER_ID),
                     f"🚨🚨 EMERGENZA WHATSAPP 🚨🚨\n\n"
                     f"Ospite WhatsApp: {nome} (+{wa_from})\n\n"
-                    f"❓ {testo}\n\n🤖 {reply}"
+                    f"❓ {testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]"
                 )
             except Exception:
                 pass
