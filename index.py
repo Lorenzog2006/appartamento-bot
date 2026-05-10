@@ -1440,6 +1440,19 @@ def webhook():
             )
             return "ok"
 
+        # ── /dashboard ── manda link sicuro alla dashboard web ──
+        if testo == "/dashboard" and is_owner:
+            if not DASHBOARD_KEY:
+                invia_messaggio(chat_id, "⚠️ DASHBOARD_KEY non configurata su Vercel.")
+                return "ok"
+            url = f"https://appartamento-bot.vercel.app/dashboard?key={DASHBOARD_KEY}"
+            invia_messaggio(chat_id,
+                f"🔗 *Dashboard*\n\n[Apri →]({url})\n\n"
+                f"⚠️ Questo link contiene la chiave: non condividerlo!",
+                parse_mode="Markdown"
+            )
+            return "ok"
+
         # ── /stats ──
         if testo == "/stats" and is_owner:
             try:
@@ -1806,6 +1819,64 @@ def dashboard_api_data():
         return ("Forbidden", 403)
     from flask import jsonify
     return jsonify(_aggrega_dashboard_data())
+
+
+@app.route("/dashboard/conversation/<path:chat_id>")
+def dashboard_conversation(chat_id):
+    if not _check_dash_key():
+        return ("Forbidden", 403)
+    from flask import Response
+    _carica_conversazioni_da_github()
+    _carica_users_da_github()
+    conv = _conversazioni.get(str(chat_id)) or {"storia": []}
+    user = _users.get(str(chat_id)) or {}
+    nome = user.get("nome", "Cliente")
+    canale = "📱 WhatsApp" if str(chat_id).startswith("wa_") else "💬 Telegram"
+    storia = conv.get("storia", [])
+    msgs_html = ""
+    for m in storia:
+        role = m.get("role", "")
+        content = (m.get("content", "") or "").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        if role == "user":
+            msgs_html += f'<div class="msg user"><div class="role">👤 Cliente</div>{content}</div>'
+        else:
+            msgs_html += f'<div class="msg bot"><div class="role">🤖 Bot / Lorenzo</div>{content}</div>'
+    if not msgs_html:
+        msgs_html = '<div class="empty">Nessun messaggio in storia (potrebbe essere scaduta).</div>'
+    info_user = ""
+    if user:
+        topic_top = ", ".join([f"{k}: {v}" for k, v in sorted(user.get("topic_count", {}).items(), key=lambda x: -x[1])[:5]])
+        info_user = f"""<div class="info">
+        <strong>Totale messaggi:</strong> {user.get('totale_msg', 0)}<br>
+        <strong>Lingua:</strong> {user.get('lingua', '?')}<br>
+        <strong>Primo messaggio:</strong> {user.get('primo_msg', '?')[:16].replace('T', ' ')}<br>
+        <strong>Ultimo messaggio:</strong> {user.get('ultimo_msg', '?')[:16].replace('T', ' ')}<br>
+        <strong>Argomenti:</strong> {topic_top or '—'}
+        </div>"""
+    key = request.args.get("key", "")
+    html = f"""<!DOCTYPE html>
+<html lang="it"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat con {nome}</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f7fa;color:#222;padding:20px;max-width:760px;margin:0 auto}}
+h1{{color:#0066cc;margin-bottom:6px;font-size:22px}}
+.sub{{color:#888;font-size:13px;margin-bottom:16px}}
+.info{{background:#fff;padding:14px;border-radius:10px;margin-bottom:16px;font-size:14px;line-height:1.6;box-shadow:0 2px 4px rgba(0,0,0,.05)}}
+.msg{{padding:10px 14px;border-radius:12px;margin-bottom:10px;max-width:80%;font-size:14px;line-height:1.4}}
+.msg.user{{background:#dbeafe;margin-left:auto;text-align:right}}
+.msg.bot{{background:#fff;border:1px solid #eee}}
+.role{{font-size:11px;color:#666;text-transform:uppercase;margin-bottom:4px;font-weight:600}}
+.empty{{text-align:center;color:#999;padding:40px;font-style:italic}}
+a{{color:#0066cc}}
+</style></head><body>
+<h1>{canale} — {nome}</h1>
+<div class="sub">Chat ID: <code>{chat_id}</code> &nbsp;·&nbsp; <a href="/dashboard?key={key}">← Torna alla dashboard</a></div>
+{info_user}
+<div>{msgs_html}</div>
+</body></html>"""
+    return Response(html, mimetype="text/html")
 
 
 @app.route("/dashboard")
