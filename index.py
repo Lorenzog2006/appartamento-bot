@@ -1031,11 +1031,17 @@ def webhook():
 
             # ── Salva media ──
             if cb_data == "SALVA_MEDIA":
+                # Idempotenza
+                if "Salvataggio in corso" in cb_testo or "Media salvato!" in cb_testo:
+                    return "ok"
                 m_fid  = re.search(r'FILE_ID: (.+)', cb_testo)
                 m_tipo = re.search(r'TIPO: (.+)', cb_testo)
                 m_kw   = re.search(r'PAROLE_CHIAVE: (.+)', cb_testo)
                 m_desc = re.search(r'DESCRIZIONE: (.+)', cb_testo)
                 if m_fid and m_tipo and m_kw and m_desc:
+                    modifica_messaggio(cb_chat_id, cb_msg_id,
+                        f"💾 Salvataggio in corso...\n\nParole chiave: {m_kw.group(1).strip()}"
+                    )
                     salvato = salva_media_su_github(
                         m_kw.group(1).strip(), m_tipo.group(1).strip(),
                         m_fid.group(1).strip(), m_desc.group(1).strip()
@@ -1046,19 +1052,30 @@ def webhook():
 
             # ── Salva Q&A o info ──
             elif cb_data == "SALVA":
+                # Idempotenza: se l'utente clicca più volte, ignora click successivi
+                if "Salvataggio in corso" in cb_testo or "Salvato!" in cb_testo or "Info aggiunta" in cb_testo:
+                    return "ok"
                 match_dq = re.search(r'D: (.+?)\nR: (.+)', cb_testo, re.DOTALL)
                 match_r  = re.search(r'R: (.+)', cb_testo, re.DOTALL)
                 if match_dq:
                     domanda  = match_dq.group(1).strip()
                     risposta = match_dq.group(2).strip()
+                    # Feedback immediato (rimuove i bottoni cosi non si puo riclickare)
+                    modifica_messaggio(cb_chat_id, cb_msg_id,
+                        f"💾 Salvataggio in corso...\n\nD: {domanda}\nR: {risposta}"
+                    )
                     salvato  = salva_su_github(f"{domanda}: {risposta}", "")
                     modifica_messaggio(cb_chat_id, cb_msg_id,
                         f"🧠 Salvato!\n\nD: {domanda}\nR: {risposta}\n\nLa prossima volta rispondo in autonomia."
                         if salvato else "❌ Errore nel salvataggio.")
                 elif match_r:
-                    salvato = salva_su_github(match_r.group(1).strip(), "")
+                    risposta = match_r.group(1).strip()
                     modifica_messaggio(cb_chat_id, cb_msg_id,
-                        f"✅ Info aggiunta:\n\n{match_r.group(1).strip()}"
+                        f"💾 Salvataggio in corso...\n\n{risposta[:200]}{'...' if len(risposta) > 200 else ''}"
+                    )
+                    salvato = salva_su_github(risposta, "")
+                    modifica_messaggio(cb_chat_id, cb_msg_id,
+                        f"✅ Info aggiunta:\n\n{risposta}"
                         if salvato else "❌ Errore nel salvataggio.")
 
             # ── Modifica date prenotazione ──
