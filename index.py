@@ -1889,139 +1889,314 @@ def dashboard_page():
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — Bot Appartamento</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover">
+<title>Dashboard Bot</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:#f5f7fa;color:#222;padding:20px;max-width:1200px;margin:0 auto}
-h1{color:#0066cc;margin-bottom:8px;font-size:24px}
-.sub{color:#888;font-size:13px;margin-bottom:20px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
-.kpi{background:#fff;padding:16px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,.06);text-align:center}
-.kpi .num{font-size:28px;font-weight:700;color:#0066cc}
-.kpi .lbl{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
-.card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,.06)}
-.card h2{font-size:16px;margin-bottom:12px;color:#333;border-bottom:1px solid #eee;padding-bottom:8px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;padding:8px 6px;background:#f8f9fa;font-weight:600;color:#555;font-size:12px;text-transform:uppercase}
-td{padding:8px 6px;border-bottom:1px solid #f0f0f0}
-tr:hover td{background:#f9fafc}
-.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
-.b-tg{background:#dbeafe;color:#1e40af}
-.b-wa{background:#dcfce7;color:#166534}
-.b-cur{background:#fef3c7;color:#92400e}
-.b-fut{background:#dbeafe;color:#1e40af}
-.b-past{background:#f3f4f6;color:#6b7280}
-.empty{color:#999;font-style:italic;text-align:center;padding:20px}
-.refresh{float:right;background:#0066cc;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px}
-a{color:#0066cc;text-decoration:none}
-a:hover{text-decoration:underline}
-@media(max-width:720px){.row{grid-template-columns:1fr}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#000;--card-r1:#2a0a0a;--card-r2:#5b1010;--card-r3:#7a1818;
+  --card-y1:#2a200a;--card-y2:#5b3e10;--card-y3:#a07208;
+  --card-g1:#0a2418;--card-g2:#0f4a30;--card-g3:#16704a;
+  --txt:#fff;--txt-mute:rgba(255,255,255,.55);--txt-light:rgba(255,255,255,.85);
+  --tab-bg:rgba(28,28,30,.86);--accent:#22c55e;
+}
+html,body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{padding:14px 14px 110px;max-width:1100px;margin:0 auto;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:6px 4px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--txt-light)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%}
+.dot.r{background:#e84141}.dot.y{background:#f7c84a}.dot.g{background:#22c55e}
+.gear{background:rgba(255,255,255,.08);border:0;color:#fff;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer}
+.section{font-size:12px;letter-spacing:.6px;color:var(--txt-mute);margin:14px 4px 10px;text-transform:uppercase;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+@media(min-width:900px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1200px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card{
+  position:relative;border-radius:22px;padding:16px 16px 14px;min-height:180px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  box-shadow:0 2px 12px rgba(0,0,0,.6);overflow:hidden;cursor:pointer;
+  transition:transform .15s ease;
+}
+.card:active{transform:scale(.98)}
+.card.red{background:radial-gradient(120% 100% at 100% 100%,var(--card-r3) 0%,var(--card-r2) 45%,var(--card-r1) 100%)}
+.card.yellow{background:radial-gradient(120% 100% at 100% 100%,var(--card-y3) 0%,var(--card-y2) 45%,var(--card-y1) 100%)}
+.card.green{background:radial-gradient(120% 100% at 100% 100%,var(--card-g3) 0%,var(--card-g2) 45%,var(--card-g1) 100%)}
+.card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.card .ttl{font-size:13.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#fff}
+.card .rank{background:rgba(0,0,0,.3);padding:3px 10px;border-radius:10px;font-size:11px;color:#fff;flex-shrink:0;font-weight:600}
+.card .big{font-size:46px;font-weight:800;line-height:1;letter-spacing:-1px;margin-top:14px;color:#fff}
+.card .sub{font-size:13px;color:#fff;font-weight:600;opacity:.95;margin-top:4px}
+.card .lines{margin-top:8px;font-size:11px;line-height:1.5;color:rgba(255,255,255,.65)}
+.card .lines b{color:rgba(255,255,255,.85);font-weight:600}
+.empty{padding:50px 20px;text-align:center;color:var(--txt-mute);font-size:14px}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;margin-bottom:6px}
+@media(min-width:600px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:rgba(255,255,255,.05);border-radius:18px;padding:14px 14px;display:flex;flex-direction:column;justify-content:center;min-height:90px}
+.kpi .v{font-size:32px;font-weight:800;color:#fff;line-height:1}
+.kpi .l{font-size:11px;color:var(--txt-mute);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.tabs{
+  position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  background:var(--tab-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-radius:30px;padding:10px 8px;display:flex;gap:6px;box-shadow:0 4px 24px rgba(0,0,0,.5);
+  border:1px solid rgba(255,255,255,.08);z-index:100;
+}
+.tab{background:transparent;border:0;color:rgba(255,255,255,.55);padding:8px 18px;border-radius:24px;cursor:pointer;font-size:12.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:70px}
+.tab.active{color:var(--accent);background:rgba(34,197,94,.15)}
+.tab .ti{font-size:18px}
+.view{display:none;animation:fadeIn .2s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.refresh{position:fixed;top:14px;right:14px;background:rgba(255,255,255,.1);border:0;color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;z-index:50}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;padding:14px;z-index:200;backdrop-filter:blur(8px)}
+.modal.open{display:flex}
+.modal-box{background:#1c1c1e;border-radius:22px;padding:22px;max-width:420px;width:100%;color:#fff;border:1px solid rgba(255,255,255,.1)}
+.modal-box h3{margin-bottom:14px;font-size:18px}
+.modal-box .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px}
+.modal-box .row b{color:rgba(255,255,255,.7);font-weight:500}
+.modal-box .row span{color:#fff;font-weight:600;text-align:right}
+.modal-box .actions{margin-top:16px;display:flex;gap:8px}
+.modal-box button{flex:1;background:rgba(255,255,255,.1);color:#fff;border:0;padding:12px;border-radius:12px;cursor:pointer;font-weight:600;font-size:13px}
+.modal-box button.primary{background:var(--accent);color:#000}
+.list-row{display:flex;justify-content:space-between;align-items:center;padding:14px;background:rgba(255,255,255,.04);border-radius:14px;margin-bottom:8px;cursor:pointer}
+.list-row:active{background:rgba(255,255,255,.08)}
+.list-row .L{display:flex;align-items:center;gap:12px}
+.list-row .L .ic{font-size:20px}
+.list-row .name{font-weight:600;font-size:14px}
+.list-row .meta{font-size:11.5px;color:var(--txt-mute);margin-top:2px}
+.list-row .R{text-align:right}
+.list-row .R .num{font-size:16px;font-weight:700}
+.list-row .R .lbl{font-size:10.5px;color:var(--txt-mute);margin-top:2px}
+.aggiornata{font-size:11px;color:var(--txt-mute);margin:8px 4px 0;text-align:center}
 </style>
 </head>
 <body>
-<h1>🏠 Dashboard — Bot Appartamento Juan les Pins
-<button class="refresh" onclick="caricaDati()">🔄 Aggiorna</button></h1>
-<div class="sub" id="aggiornata">Caricamento...</div>
+<button class="refresh" onclick="caricaDati()" title="Aggiorna">↻</button>
 
-<div class="kpis" id="kpis"></div>
+<header>
+  <div class="legend">
+    <span><span class="dot r"></span>Inattivo</span>
+    <span><span class="dot y"></span>Recente</span>
+    <span><span class="dot g"></span>Attivo</span>
+  </div>
+</header>
 
-<div class="row">
-  <div class="card"><h2>📊 Argomenti più richiesti</h2><canvas id="grafTopic"></canvas></div>
-  <div class="card"><h2>🌍 Lingue</h2><canvas id="grafLingue"></canvas></div>
+<!-- VIEW 1: CLIENTI (Top per attività) -->
+<div class="view active" id="view-clienti">
+  <div class="section">Tutti i clienti</div>
+  <div class="grid" id="clientiGrid"><div class="empty">Caricamento...</div></div>
 </div>
 
-<div class="card" style="margin-bottom:16px">
-  <h2>💬 Conversazioni attive (ultime 24h)</h2>
-  <div id="conversazioni"></div>
+<!-- VIEW 2: ARGOMENTI -->
+<div class="view" id="view-argomenti">
+  <div class="section">Argomenti più richiesti</div>
+  <div class="grid" id="argomentiGrid"><div class="empty">Caricamento...</div></div>
 </div>
 
-<div class="card" style="margin-bottom:16px">
-  <h2>👥 Top clienti per attività</h2>
-  <div id="topClienti"></div>
-</div>
-
-<div class="row">
-  <div class="card"><h2>📅 Prenotazioni correnti</h2><div id="prenCorrenti"></div></div>
-  <div class="card"><h2>🔮 Prenotazioni prossime</h2><div id="prenProssime"></div></div>
-</div>
-
-<div class="card" style="margin-bottom:16px">
-  <h2>📦 Prenotazioni passate</h2>
+<!-- VIEW 3: PRENOTAZIONI -->
+<div class="view" id="view-prenotazioni">
+  <div class="section">Prenotazioni in corso</div>
+  <div id="prenCorrenti"></div>
+  <div class="section">Prossime prenotazioni</div>
+  <div id="prenProssime"></div>
+  <div class="section">Storico</div>
   <div id="prenPassate"></div>
 </div>
 
-<div class="card" style="margin-bottom:24px">
-  <h2>📸 Media salvati</h2>
+<!-- VIEW 4: PANORAMICA -->
+<div class="view" id="view-stats">
+  <div class="section">Panoramica</div>
+  <div class="kpis" id="kpis"></div>
+  <div class="section">Conversazioni attive (24h)</div>
+  <div id="conversazioni"></div>
+  <div class="section">Lingue</div>
+  <div class="grid" id="lingueGrid"></div>
+  <div class="section">Media salvati</div>
   <div id="mediaList"></div>
+</div>
+
+<div class="aggiornata" id="aggiornata">Caricamento...</div>
+
+<!-- Bottom tab bar -->
+<nav class="tabs">
+  <button class="tab active" data-view="clienti"><span class="ti">👥</span>Clienti</button>
+  <button class="tab" data-view="argomenti"><span class="ti">💡</span>Argomenti</button>
+  <button class="tab" data-view="prenotazioni"><span class="ti">📅</span>Prenot.</button>
+  <button class="tab" data-view="stats"><span class="ti">📊</span>Stats</button>
+</nav>
+
+<!-- Modale dettaglio cliente -->
+<div class="modal" id="modalCliente" onclick="if(event.target===this)chiudiModale()">
+  <div class="modal-box" id="modalClienteBox"></div>
 </div>
 
 <script>
 const KEY = """ + json.dumps(key) + """;
-let chTopic, chLingue;
-function vuoto(t){return '<div class="empty">'+t+'</div>'}
-function badgeC(c){return c==='whatsapp'?'<span class="badge b-wa">📱 WA</span>':'<span class="badge b-tg">💬 TG</span>'}
-function tabella(rows, cols){
-  if(!rows.length)return vuoto('Nessun dato.');
-  let h='<table><thead><tr>'+cols.map(c=>'<th>'+c.l+'</th>').join('')+'</tr></thead><tbody>';
-  rows.forEach(r=>{h+='<tr>'+cols.map(c=>'<td>'+(c.f?c.f(r):r[c.k]||'—')+'</td>').join('')+'</tr>'});
-  return h+'</tbody></table>';
+let DATI = null;
+
+function fmtData(s){if(!s)return '—';return s.substring(0,16).replace('T',' ')}
+function badgeCanale(c){return c==='whatsapp'?'📱 WhatsApp':'💬 Telegram'}
+
+function colorByActivity(ultimoIso){
+  if(!ultimoIso)return 'red';
+  const d=new Date(ultimoIso);
+  const days=(Date.now()-d.getTime())/86400000;
+  if(days<7)return 'green';
+  if(days<30)return 'yellow';
+  return 'red';
 }
+
+function colorByRank(rank,total){
+  // top 33% verde, mid 33% giallo, bottom rosso
+  const r=rank/total;
+  if(r<=.33)return 'green';
+  if(r<=.66)return 'yellow';
+  return 'red';
+}
+
+function renderClienti(){
+  const g=document.getElementById('clientiGrid');
+  const lst=DATI.top_clienti||[];
+  if(!lst.length){g.innerHTML='<div class="empty">Nessun cliente registrato.<br><br>Apparirà qui appena ricevi il primo messaggio.</div>';return}
+  g.innerHTML=lst.map((c,i)=>{
+    const rank=i+1;
+    const color=colorByActivity(c.ultimo_msg);
+    const username=c.username?' @'+c.username:'';
+    return `<div class="card ${color}" onclick='apriCliente(${JSON.stringify(c)})'>
+      <div class="top">
+        <div class="ttl">${escapeHtml((c.nome||'?').slice(0,20))}</div>
+        <div class="rank"># ${rank}°</div>
+      </div>
+      <div>
+        <div class="big">${c.totale_msg||0}</div>
+        <div class="sub">messaggi</div>
+        <div class="lines">
+          <div><b>${badgeCanale(c.canale)}</b>${username?' · '+escapeHtml(username):''}</div>
+          <div><b>Topic:</b> ${escapeHtml(c.topic_top||'—')}</div>
+          <div><b>Ultimo:</b> ${fmtData(c.ultimo_msg)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderArgomenti(){
+  const g=document.getElementById('argomentiGrid');
+  const arg=DATI.argomenti||{};
+  const tot=Object.values(arg).reduce((a,b)=>a+b,0)||1;
+  const ordinati=Object.entries(arg).sort((a,b)=>b[1]-a[1]);
+  if(!ordinati.length){g.innerHTML='<div class="empty">Nessun argomento ancora tracciato.</div>';return}
+  g.innerHTML=ordinati.map(([nome,n],i)=>{
+    const rank=i+1;
+    const color=colorByRank(rank,ordinati.length);
+    const pct=Math.round(n/tot*100);
+    const emoji=topicEmoji(nome);
+    return `<div class="card ${color}">
+      <div class="top">
+        <div class="ttl">${emoji} ${escapeHtml(nome)}</div>
+        <div class="rank"># ${rank}°</div>
+      </div>
+      <div>
+        <div class="big">${n}</div>
+        <div class="sub">messaggi</div>
+        <div class="lines">
+          <div><b>${pct}%</b> del totale</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function topicEmoji(t){
+  const m={"wifi":"📶","check-in":"🔑","check-out":"🚪","parcheggio":"🚗","spiaggia":"🌊","supermercato":"🛒","ristorante":"🍽️","lavatrice":"🧺","aria condizionata":"❄️","emergenza":"🚨","trasporti":"🚌","altro":"💬"};
+  return m[t]||"💬";
+}
+
+function listRow(ic,name,meta,num,lbl,onclick){
+  return `<div class="list-row" ${onclick?'onclick="'+onclick+'"':''}>
+    <div class="L"><span class="ic">${ic}</span><div><div class="name">${escapeHtml(name)}</div><div class="meta">${escapeHtml(meta||'')}</div></div></div>
+    <div class="R"><div class="num">${num||''}</div><div class="lbl">${lbl||''}</div></div>
+  </div>`;
+}
+
+function renderPrenotazioni(){
+  const fmt=l=>l.length?l.map(p=>listRow('📅',p.nome,p.lingua,p.checkin+' → '+p.checkout,'')).join(''):'<div class="empty">Nessuna.</div>';
+  document.getElementById('prenCorrenti').innerHTML=fmt(DATI.prenotazioni_correnti);
+  document.getElementById('prenProssime').innerHTML=fmt(DATI.prenotazioni_prossime);
+  document.getElementById('prenPassate').innerHTML=fmt(DATI.prenotazioni_passate);
+}
+
+function renderStats(){
+  const k=DATI.kpi||{};
+  document.getElementById('kpis').innerHTML=[
+    ['Totale msg','totale_lifetime'],['Oggi','totale_oggi'],
+    ['Clienti','totale_clienti'],['Attivi 7gg','ospiti_attivi']
+  ].map(([l,key])=>`<div class="kpi"><div class="v">${k[key]||0}</div><div class="l">${l}</div></div>`).join('');
+  // Conversazioni attive
+  const cv=DATI.conversazioni_attive||[];
+  document.getElementById('conversazioni').innerHTML=cv.length?cv.map(c=>{
+    const ic=c.canale==='whatsapp'?'📱':'💬';
+    return `<div class="list-row" onclick="window.open('/dashboard/conversation/'+encodeURIComponent('${c.chat_id}')+'?key='+encodeURIComponent(KEY),'_blank')">
+      <div class="L"><span class="ic">${ic}</span><div><div class="name">${escapeHtml(c.nome||'?')}</div><div class="meta">Ultimo: ${escapeHtml(c.ultimo_msg)}</div></div></div>
+      <div class="R"><div class="num">${c.msg_in_storia}</div><div class="lbl">msg</div></div>
+    </div>`;
+  }).join(''):'<div class="empty">Nessuna conversazione attiva.</div>';
+  // Lingue come mini-card
+  const lg=DATI.lingue||{};
+  const totL=Object.values(lg).reduce((a,b)=>a+b,0)||1;
+  document.getElementById('lingueGrid').innerHTML=Object.entries(lg).sort((a,b)=>b[1]-a[1]).map(([l,n],i)=>{
+    const flags={"italian":"🇮🇹","english":"🇬🇧","french":"🇫🇷","spanish":"🇪🇸","german":"🇩🇪","portuguese":"🇵🇹","dutch":"🇳🇱"};
+    const color=colorByRank(i+1,Object.keys(lg).length);
+    return `<div class="card ${color}" style="min-height:140px"><div class="top"><div class="ttl">${flags[l]||'🌍'} ${escapeHtml(l)}</div></div><div><div class="big">${n}</div><div class="sub">${Math.round(n/totL*100)}% del totale</div></div></div>`;
+  }).join('');
+  // Media
+  const md=DATI.media||[];
+  document.getElementById('mediaList').innerHTML=md.length?md.map(m=>{
+    const ic=m.tipo==='video'?'🎬':'📸';
+    return listRow(ic,m.keywords||'?',m.caption||'','','');
+  }).join(''):'<div class="empty">Nessun media salvato.</div>';
+}
+
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function apriCliente(c){
+  const box=document.getElementById('modalClienteBox');
+  const url='/dashboard/conversation/'+encodeURIComponent(c.chat_id)+'?key='+encodeURIComponent(KEY);
+  box.innerHTML=`<h3>${escapeHtml(c.nome||'Cliente')}</h3>
+    <div class="row"><b>Canale</b><span>${badgeCanale(c.canale)}</span></div>
+    <div class="row"><b>Username</b><span>${escapeHtml(c.username||'—')}</span></div>
+    <div class="row"><b>Lingua</b><span>${escapeHtml(c.lingua||'—')}</span></div>
+    <div class="row"><b>Messaggi totali</b><span>${c.totale_msg||0}</span></div>
+    <div class="row"><b>Topic preferito</b><span>${escapeHtml(c.topic_top||'—')}</span></div>
+    <div class="row"><b>Primo contatto</b><span>${fmtData(c.primo_msg)}</span></div>
+    <div class="row"><b>Ultimo contatto</b><span>${fmtData(c.ultimo_msg)}</span></div>
+    <div class="row"><b>Chat ID</b><span style="font-family:monospace;font-size:11px">${escapeHtml(c.chat_id)}</span></div>
+    <div class="actions">
+      <button onclick="chiudiModale()">Chiudi</button>
+      <button class="primary" onclick="window.open('${url}','_blank')">Vedi chat →</button>
+    </div>`;
+  document.getElementById('modalCliente').classList.add('open');
+}
+function chiudiModale(){document.getElementById('modalCliente').classList.remove('open')}
+
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  const v=t.dataset.view;
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  window.scrollTo(0,0);
+}));
+
 async function caricaDati(){
-  document.getElementById('aggiornata').textContent='Caricamento...';
+  document.getElementById('aggiornata').textContent='⏳ Caricamento...';
   try{
     const r=await fetch('/dashboard/api/data?key='+encodeURIComponent(KEY));
-    if(!r.ok){document.getElementById('aggiornata').textContent='Errore '+r.status;return}
-    const d=await r.json();
-    document.getElementById('aggiornata').textContent='Aggiornata: '+d.generato_il;
-    // KPI
-    document.getElementById('kpis').innerHTML=[
-      ['Totale messaggi','totale_lifetime'],
-      ['Messaggi oggi','totale_oggi'],
-      ['Clienti totali','totale_clienti'],
-      ['Ospiti attivi (7gg)','ospiti_attivi']
-    ].map(([l,k])=>'<div class="kpi"><div class="num">'+(d.kpi[k]||0)+'</div><div class="lbl">'+l+'</div></div>').join('');
-    // Grafici
-    if(chTopic)chTopic.destroy();
-    chTopic=new Chart(document.getElementById('grafTopic'),{type:'bar',data:{labels:Object.keys(d.argomenti),datasets:[{label:'Messaggi',data:Object.values(d.argomenti),backgroundColor:'#0066cc'}]},options:{plugins:{legend:{display:false}},responsive:true}});
-    if(chLingue)chLingue.destroy();
-    chLingue=new Chart(document.getElementById('grafLingue'),{type:'doughnut',data:{labels:Object.keys(d.lingue),datasets:[{data:Object.values(d.lingue),backgroundColor:['#0066cc','#22c55e','#f59e0b','#ef4444','#a855f7']}]},options:{responsive:true}});
-    // Conversazioni
-    document.getElementById('conversazioni').innerHTML=tabella(d.conversazioni_attive,[
-      {l:'Canale',f:r=>badgeC(r.canale)},
-      {l:'Nome',k:'nome'},
-      {l:'Msg',k:'msg_in_storia'},
-      {l:'Ultimo',k:'ultimo_msg'},
-      {l:'Storia',f:r=>'<a href="/dashboard/conversation/'+encodeURIComponent(r.chat_id)+'?key='+encodeURIComponent(KEY)+'" target="_blank">Vedi →</a>'}
-    ]);
-    // Top clienti
-    document.getElementById('topClienti').innerHTML=tabella(d.top_clienti,[
-      {l:'#',f:(r,i)=>r._i||''},
-      {l:'Canale',f:r=>badgeC(r.canale)},
-      {l:'Nome',f:r=>r.nome+(r.username?' <span style="color:#888">@'+r.username+'</span>':'')},
-      {l:'Msg totali',k:'totale_msg'},
-      {l:'Topic top',k:'topic_top'},
-      {l:'Lingua',k:'lingua'},
-      {l:'Primo',f:r=>(r.primo_msg||'').substring(0,10)},
-      {l:'Ultimo',f:r=>(r.ultimo_msg||'').substring(0,16).replace('T',' ')}
-    ].map((c,i)=>i===0?{l:'#',f:(r)=>d.top_clienti.indexOf(r)+1}:c));
-    // Prenotazioni
-    const colsPren=[
-      {l:'Nome',k:'nome'},{l:'Check-in',k:'checkin'},{l:'Check-out',k:'checkout'},{l:'Lingua',k:'lingua'}
-    ];
-    document.getElementById('prenCorrenti').innerHTML=tabella(d.prenotazioni_correnti,colsPren);
-    document.getElementById('prenProssime').innerHTML=tabella(d.prenotazioni_prossime,colsPren);
-    document.getElementById('prenPassate').innerHTML=tabella(d.prenotazioni_passate,colsPren);
-    // Media
-    document.getElementById('mediaList').innerHTML=tabella(d.media,[
-      {l:'#',k:'n'},
-      {l:'Tipo',f:r=>r.tipo==='video'?'🎬 Video':'📸 Foto'},
-      {l:'Keywords',k:'keywords'},
-      {l:'Caption',k:'caption'}
-    ]);
-  }catch(e){document.getElementById('aggiornata').textContent='Errore: '+e.message}
+    if(!r.ok){document.getElementById('aggiornata').textContent='❌ Errore '+r.status;return}
+    DATI=await r.json();
+    renderClienti();renderArgomenti();renderPrenotazioni();renderStats();
+    document.getElementById('aggiornata').textContent='✓ Aggiornata: '+DATI.generato_il;
+  }catch(e){document.getElementById('aggiornata').textContent='❌ '+e.message}
 }
 caricaDati();
 setInterval(caricaDati,60000);
