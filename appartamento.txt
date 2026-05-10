@@ -1,4 +1,4 @@
-INFORMAZIONI APPARTAMENTO - JUAN LES PINES
+INFORMAZIONI APPARTAMENTO - JUAN LES PINS
 
 === RISPOSTE RAPIDE — DOMANDE FREQUENTI ===
 Check-in: dalle 16:00
@@ -9,7 +9,7 @@ Citofono: GUZZI
 Codice KeyBox (cassettina chiavi): 8492 — contiene il telecomando del garage
 Ingresso garage: 67 Chemin des Liserons, Antibes
 Posto auto: numero 53 (ultimo a sinistra a ridosso del muro, in fondo alla rampa)
-Wifi: vedi nome rete e password su foglio in casa
+Wifi: vedi nome rete e password sotto
 Lavatrice: sì, presente in appartamento
 Lavastoviglie: no
 Aria condizionata: sì, in soggiorno e in camera da letto
@@ -20,114 +20,134 @@ Proprietario: Lorenzo — contatto disponibile su richiesta
 Spiaggia più vicina: 150 metri a piedi
 ===========================================
 
-INDIRIZZO E ACCESSO
-Indirizzo: 93 Bd Raymond Poincaré06160 Antibes, Francia
-Ingresso Box auto : 67 Chem. des Liserons
-Antibes, Francia
-Piano: 2 Piano 
-Numero appartamento 23 lo vedi in alto a destra della porta di ingresso
-Citofono: GUZZI
-Codice KeyBox : 8492
-Check-in: dalle 16:00
-Check-out: entro le 10:00
-
 WIFI
 Nome rete: Freebox-32B57A
 Password: ftctsqvmrdqv7wwwqmrvcd
 
 DOTAZIONI
-Numero camere: 2 camere
-Numero bagni: 1 bagno
-Posti letto: 4 posti letto
-Aria condizionata: si in soggiorno e in camera da letto
+Numero camere: 2
+Numero bagni: 1
+Posti letto: 4
+Aria condizionata: si, in soggiorno e in camera da letto
 Lavatrice: si
 Lavastoviglie: no
-Asciugacapelli: si 
+Asciugacapelli: si
 Ferro da stiro: si
 
 CUCINA
-Attrezzatura disponibile: [ELENCA]
-Moka/Caffettiera: si della Nespresso
-Forno: [si
+Attrezzatura: pentole, padelle, posate, piatti, bicchieri, tazze, coltelli, taglieri, mestoli, scolapasta, ciotole
+Macchinetta caffè: si, Nespresso (a capsule)
+Bollitore elettrico: si
+Forno: si
 Microonde: si
+Tostapane: no
+Frullatore/mixer: no
+Lavastoviglie: no
 
 REGOLE
 - Vietato fumare in appartamento
 - Animali: ammessi previo informare il proprietario
 - Silenzio dalle 22:00 alle 08:00
 - Feste non consentite
-- Rifiuti: al piano terra uscendo lato cortile sulla destra ce una porta che da accesso al locale rifiuti
+- Rifiuti: al piano terra uscendo lato cortile sulla destra c'è una porta che da accesso al locale rifiuti
 
 PARCHEGGIO
-Una volta entrati dal cancello elettrico tenersi subito sulla sinistra scendere la rampa aprire altro cancello elettrico, poi proseguire dritto fino in fondo , il posto auto è quello tutto a sinistra contro il muro numero 53
+Indirizzo ingresso garage: 67 Chemin des Liserons, Antibes
+Posto auto: numero 53
+Istruzioni:
+1. Entra dal cancello elettrico (apertura tramite il telecomando dentro la KeyBox)
+2. Tieniti subito sulla sinistra e scendi la rampa
+3. Apri il secondo cancello elettrico in fondo
+4. Procedi dritto fino in fondo
+5. Il posto auto 53 è quello tutto a sinistra contro il muro
+
+Una volta parcheggiato: la porta per salire ai piani la trovi di fronte al posto auto. L'ascensore è di fronte al posto auto, dietro la porta grigia.
 
 SPIAGGIA E CENTRO
-La prima spiaggia libera dista appena 150 metri dall'appartamento , poi ci sono altre spiagge 
+La prima spiaggia libera dista appena 150 metri dall'appartamento, poi ci sono altre spiagge.
+
 🏖️ SPIAGGE PUBBLICHE (gratuite)
 Plage de Juan-les-Pins · ~1km a piedi · ☎ +33 4 93 61 16 74
-⭐ 4.4 · La classica spiaggia sabbiosa di Juan. Acqua cristallina, bagnini, docce e servizi. Una delle poche spiagge sabbiose della zona. Può affollarssi d'estate.
+⭐ 4.4 · La classica spiaggia sabbiosa di Juan. Acqua cristallina, bagnini, docce e servizi. Una delle poche spiagge sabbiose della zona. Può affollarsi d'estate.
+
 Plage d'Antibes Juan-les-Pins · ~1,3km a piedi
 ⭐ 4.4 · Spiaggia pubblica sul Bd Charles Guillaumont, sabbiosa, acqua bassa ottima per famiglie con bambini. Più tranquilla della precedente, con aria un po' più local.
 
 🌊 STABILIMENTI PRIVATI (lettini + ristorante)
 Yolo Plage — 22 Bd Charles Guillaumont · ~900m · ☎ +33 7 63 72 78 81
-⭐ 4.3 · Il più apprezzato della zona. Sabbia finissima definita dai recensori "la migliore di tutta la Costa Azzurra". Lettini comodi con spazio, ottimi cocktail e cibo di qualità. Aperto 10:00–23:00.
+⭐ 4.3 · Il più apprezzato della zona. Sabbia finissima. Lettini comodi, ottimi cocktail e cibo di qualità. Aperto 10:00–23:00.
+
 Epi Beach — Bd Charles Guillaumont · ~1km · ☎ +33 4 93 61 31 69
-⭐ 4.0 · Beach club con ristorante, bar, musica live e atmosfera serale. Aperto dalle 9:00 all'1:00 di notte — ottimo per chi vuole godersi il tramonto e restare fino a tardi. Prezzi alti.
+⭐ 4.0 · Beach club con ristorante, bar, musica live e atmosfera serale. Aperto dalle 9:00 all'1:00 di notte. Prezzi alti.
+
 Estérel Plage — 28 Bd Charles Guillaumont · ~1km · ☎ +33 4 92 94 10 15
-⭐ 3.9 · Aperto dalle 7:30 (perfetto per la colazione sul mare). Ambiente mediterraneo, servizio altalenante secondo le recensioni.
+⭐ 3.9 · Aperto dalle 7:30 (perfetto per la colazione sul mare). Ambiente mediterraneo.
+
 L'Effet Mer Plage — 37 bis Bd Charles Guillaumont · ~1,1km · ☎ +33 6 38 30 27 46
-⭐ 3.8 · Vista spettacolare, ideale per la cena al tramonto. Aperto 10:30–23:00. Servizio da migliorare ma location eccezionale.
+⭐ 3.8 · Vista spettacolare, ideale per la cena al tramonto. Aperto 10:30–23:00.
 
 🌙 SERALE / ESCLUSIVO
 Villa Djunah Beach — Bd du Littoral · ~1,5km · ☎ +33 9 70 68 31 50
-⭐ 4.0 · Lounge bar sulla spiaggia, atmosfera orientale e lussuosa. Aperto solo venerdì e sabato sera dalle 18:00 alle 2:00. Per una serata speciale.
+⭐ 4.0 · Lounge bar sulla spiaggia, atmosfera orientale e lussuosa. Aperto solo venerdì e sabato sera dalle 18:00 alle 2:00.
 
-💡 Consiglio pratico per i tuoi ospiti: tutti gli stabilimenti privati si trovano sul Bd Charles Guillaumont, percorribile a piedi in 10-15 minuti dall'appartamento. Per l'estate ti consiglio di suggerire Yolo Plage come prima scelta — prenota i lettini online in anticipo perché si esauriscono presto in luglio/agosto.
+💡 Tutti gli stabilimenti privati si trovano sul Bd Charles Guillaumont, percorribile a piedi in 10-15 minuti dall'appartamento. In estate prenotare i lettini in anticipo (Yolo Plage si esaurisce presto in luglio/agosto).
 
 SUPERMERCATI VICINI
 🛒 SUPERMERCATI — dal più vicino al più lontano
+
 Auchan — 138 Bd du Président Wilson · ~550m · ☎ +33 4 97 21 75 00 · ⭐ 4.3
-Il migliore della zona per qualità e assortimento. Lun–Sab 8:00–20:00 / Dom 8:30–12:30. Il top per la spesa principale.
+Il migliore della zona per qualità e assortimento. Lun–Sab 8:00–20:00 / Dom 8:30–12:30.
+
 LNS Alimentazione Generale — 112 Bd du Président Wilson · ~600m · ☎ +33 6 25 50 64 67
-⚠️ Recensioni miste sui prodotti freschi, ma è il negozio d'emergenza notturna: aperto dalle 16:00 alle 3:00 di notte tutti i giorni. Utilissimo da comunicare agli ospiti.
+Negozio d'emergenza notturna: aperto dalle 16:00 alle 3:00 di notte tutti i giorni. Recensioni miste sui prodotti freschi.
+
 Carrefour City — 122 Bd du Président Wilson · ~700m · ☎ +33 9 67 11 13 24 · ⭐ 3.9
-Il più comodo per orari serali: aperto 7:00–21:00 tutti i giorni (Dom 8:00–21:00). Assortimento basico ma sempre aperto.
+Comodo per orari serali: 7:00–21:00 tutti i giorni (Dom 8:00–21:00). Assortimento basico.
+
 SPAR — 21 Bd Raymond Poincaré · ~750m · ☎ +33 4 93 67 03 69 · ⭐ 3.7
-Aperto 7:00–20:00 tutti i giorni. Si trova sul tuo stesso boulevard — comodo dopo una passeggiata. Pane fresco, frutta e verdura.
+Aperto 7:00–20:00 tutti i giorni. Sullo stesso boulevard. Pane fresco, frutta e verdura.
+
 Utile Supermarket — 26 Av. Amiral Courbet · ~1km · ☎ +33 9 67 31 77 46 · ⭐ 4.0
-Piccolo ma ben fornito, staff gentile. Lun–Sab 7:30–20:00 / Dom 8:00–13:00. Buona scelta di prodotti locali.
+Piccolo ma ben fornito. Lun–Sab 7:30–20:00 / Dom 8:00–13:00.
+
 Franprix — 35 Av. Amiral Courbet · ~1km · ☎ +33 4 93 67 56 38 · ⭐ 3.8
-Sezione kosher, pastries calde al mattino, pollo arrosto da asporto. Lun–Sab 8:30–19:30 / Mer fino alle 20:00. Chiuso domenica sera (aperto dom mattina).
+Sezione kosher, pastries calde al mattino, pollo arrosto da asporto. Lun–Sab 8:30–19:30 / Mer fino alle 20:00. Chiuso domenica sera.
+
 Auchan Poincaré — 71 Bd Raymond Poincaré · ~1,2km · ☎ +33 4 22 21 53 00 · ⭐ 4.1
-Un secondo Auchan, sempre sul tuo boulevard ma più verso il centro. Ottimi prezzi, staff cordiale. Lun–Sab 8:00–20:00 / Dom 8:30–12:30.
+Secondo Auchan più verso il centro. Ottimi prezzi. Lun–Sab 8:00–20:00 / Dom 8:30–12:30.
+
 Super U Antibes — 10 Rue du Jardin Secret · ~2km · ☎ +33 4 93 61 22 22 · ⭐ 3.8
-Il più grande della zona — sushi fatto in casa, ampia scelta vini e formaggi. Aperto 7 giorni su 7 fino alle 20:30 (Dom fino alle 20:00). Da raggiungere in auto.
+Il più grande della zona. Sushi, ampia scelta vini e formaggi. 7gg/7 fino alle 20:30 (Dom 20:00). Da raggiungere in auto.
 
-💡 Consigli pratici per la guida Casa Juan:
-
-Spesa principale → Auchan (Bd Wilson) o Auchan Poincaré, migliori prezzi e assortimento
-Serale/urgenza → Carrefour City (fino alle 21) o LNS (fino alle 3:00!)
-Domenica mattina → Auchan, SPAR o Utile sono tutti aperti
-Colazione fresca → Franprix o SPAR aprono alle 7:00–7:30
+💡 Consigli pratici:
+- Spesa principale → Auchan o Auchan Poincaré
+- Serale/urgenza → Carrefour City (fino alle 21) o LNS (fino alle 3:00)
+- Domenica mattina → Auchan, SPAR o Utile sono aperti
+- Colazione fresca → Franprix o SPAR aprono alle 7:00–7:30
 
 RISTORANTI CONSIGLIATI
 🍽️ RISTORANTI
+
 Restaurant Le J — 17 Av. Dr Dautheville · ~500m · ☎ +33 4 93 74 15 14
-⭐ 4.8 · Cucina francese creativa, piccolo e curato, considerato il migliore della zona. Chiuso lun e dom. Prenotazione obbligatoria.
+⭐ 4.8 · Cucina francese creativa, considerato il migliore della zona. Chiuso lun e dom. Prenotazione obbligatoria.
+
 Cap Riviera — 13 Bd Édouard Baudoin · ~350m · ☎ +33 4 93 61 22 30
-⭐ 4.6 · Cucina di pesce direttamente sul mare. Aperto tutti i giorni a pranzo e cena. Ottima scelta per una serata romantica con i tuoi ospiti.
+⭐ 4.6 · Cucina di pesce direttamente sul mare. Aperto tutti i giorni a pranzo e cena. Romantico.
+
 Le Bistrot — 27 Av. Amiral Courbet · ~900m · ☎ +33 4 93 74 51 28
-⭐ 4.6 · Bistrot francese tradizionale, amato dai locali. Chiuso mercoledì. Atmosphere raccolta con giardino esterno.
+⭐ 4.6 · Bistrot francese tradizionale, amato dai locali. Chiuso mercoledì. Atmosfera raccolta con giardino esterno.
+
 Ti Toques — 9 Av. Louis Gallet · ~700m · ☎ +33 4 92 90 25 12
-⭐ 4.7 · Qualità da stellato Michelin a prezzi ragionevoli. Specialità di pesce e ottima selezione. Chiuso lun e dom.
+⭐ 4.7 · Qualità da stellato Michelin a prezzi ragionevoli. Specialità di pesce. Chiuso lun e dom.
+
 L'Escale — 8 Bd Édouard Baudoin · ~450m · ☎ +33 4 93 61 80 08
-⭐ 4.2 · Aperto dalle 9 alle 22 tutti i giorni, anche domenica. Il posto ideale per colazione, pranzo o una cena informale sul lungomare.
+⭐ 4.2 · Aperto 9:00–22:00 tutti i giorni. Ideale per colazione, pranzo o cena informale sul lungomare.
+
 L'Horizon — 37 Bis Bd Charles Guillaumont · ~1,1km · ☎ +33 4 93 67 23 11
-⭐ 4.3 · Vista sulla spiaggia di Antibes, ottima paella e frutti di mare. Bel rapporto qualità/prezzo.
+⭐ 4.3 · Vista sulla spiaggia di Antibes, ottima paella e frutti di mare. Buon rapporto qualità/prezzo.
 
 EMERGENZE E CONTATTI
-Proprietario: Lorenzo - 00393202599675
+Proprietario: Lorenzo — +39 320 259 9675
 
 🔧 EMERGENZE TECNICHE APPARTAMENTO
 In caso di guasto o problema urgente contatta subito il proprietario Lorenzo: +39 320 259 9675
@@ -150,75 +170,86 @@ DCI Serrurier: +33 4 93 91 46 73
 Chiudi subito il rubinetto del gas, apri tutte le finestre, esci dall'appartamento e chiama: 0800 47 33 33 (gratuito 24h/24)
 
 💧 ALLAGAMENTO / PERDITA ACQUA
-Chiudi il rubinetto generale dell'acqua (sotto il lavello in cucina) e chiama subito il proprietario e l'idraulico.
+Chiudi il rubinetto generale dell'acqua. La valvola si trova nel corridoio esterno, nel terzo sportello. La manopola è quella in basso a sinistra con la targhetta 23. Poi chiama subito il proprietario e l'idraulico.
 
 ⚡ BLACKOUT / GUASTO ELETTRICO
-Controlla il quadro elettrico nel corridoio: se gli interruttori sono abbassati, rialzali. Se il problema persiste chiama il proprietario e l'elettricista.
+Controlla il quadro elettrico (contatore) all'ingresso, nello sportello bianco sulla sinistra prima della camera da letto. Se gli interruttori sono abbassati, rialzali. Se il problema persiste chiama il proprietario e l'elettricista.
+
 🏥 STRUTTURE SANITARIE VICINE
+
 🟢 Prima scelta — urgenze non gravi
 Maison Médicale MMF Santé · 60 Chemin des Sables, Juan-les-Pins · ~500m a piedi · ☎ +33 4 92 38 35 32
-⭐ 4.3 · Medico senza appuntamento, attese brevi, staff che parla inglese. Radiografie in loco. Visita ~50€ per i turisti. Aperto 7 giorni su 7: Lun–Sab 9:00–19:00 / Dom 9:00–13:00. Ottima per qualsiasi problema non grave: febbre, infezioni, cadute, taglietti, ecc.
+⭐ 4.3 · Medico senza appuntamento, attese brevi, staff che parla inglese. Radiografie in loco. Visita ~50€ per i turisti. Aperto 7gg/7: Lun–Sab 9:00–19:00 / Dom 9:00–13:00. Per qualsiasi problema non grave: febbre, infezioni, cadute, taglietti, ecc.
 
 🔴 Emergenze gravi — Pronto Soccorso
 Centre Hospitalier d'Antibes — Urgences · 107 Av. de Nice, Antibes · ~4km (10 min in auto) · ☎ +33 4 97 24 77 77
-Aperto 24h/24, 7 giorni su 7. È l'unico vero pronto soccorso della zona. Le recensioni sono altalenanti (soprattutto sulla lingua — poco inglese), ma è la struttura di riferimento per tutto il comprensorio.
+Aperto 24h/24, 7gg/7. È l'unico vero pronto soccorso della zona.
 
-📞 NUMERI DI EMERGENZA DA TENERE SEMPRE A PORTATA
-ServizioNumero🚑 SAMU (ambulanza)15🚒 Pompiers (vigili del fuoco, anche per emergenze mediche)18🆘 Emergenza europea (da cellulare)112🚓 Police17☠️ Centro antiveleni+33 4 91 75 25 25
+📞 NUMERI DI EMERGENZA
+🚑 SAMU (ambulanza): 15
+🚒 Pompiers (vigili del fuoco, anche emergenze mediche): 18
+🆘 Emergenza europea (da cellulare): 112
+🚓 Police: 17
+☠️ Centro antiveleni: +33 4 91 75 25 25
 
 ISTRUZIONI CHECK-OUT
-1. Lasciare le chiavi sul tavolo in sala tenere solo telecomando per uscire con auto
+Orario: entro le 10:00
+Procedura:
+1. Lasciare le chiavi sul tavolo in sala (tenere solo il telecomando per uscire dal garage)
 2. Chiudere tutte le finestre
 3. Spegnere aria condizionata e luci
-4. Portare i rifiuti fuori
-5. Scendere in garage -1 prendere auto uscire lasciare telecomando nella keybox e chiudere cambiando codice
-
-
+4. Portare i rifiuti fuori (locale al piano terra, lato cortile)
+5. Scendere in garage -1, prendere l'auto, uscire
+6. Lasciare il telecomando nella KeyBox e chiudere cambiando il codice
 
 💊 FARMACIE
 Pharmacie Provençale et du Casino — 144 Bd du Président Wilson · ~500m · ☎ +33 4 93 61 09 23
 ⭐ 4.3 · Staff che parla inglese. Lun-Sab 9:00–12:30 / 14:30–19:00. Chiusa domenica.
+
 Pharmacie de la Gare — 1 Bis Av. l'Estérel · ~700m · ☎ +33 4 93 61 01 24
 ⭐ 4.2 · Lun-Ven 8:30–19:30 / Sab 8:30–13:00 e 14:00–19:00. Chiusa domenica.
+
 Pharmacie de l'Estérel — 8 Av. l'Estérel · ~800m · ☎ +33 4 93 61 05 38
 ⭐ 4.2 · Personale che parla inglese. Lun-Ven 8:30–19:00 / Sab 8:30–12:30 e 14:30–18:30.
 
-
-
 🌴 ATTIVITÀ E COSE DA FARE
-Parc de la Pinède — 7 Bd de la Pinède · ~400m
-⭐ 4.6 · Parco apertissimo H24, con area giochi per bambini. Uno dei migliori parco-giochi della Costa Azzurra secondo le recensioni.
-Plage de Juan-les-Pins — Bd de la Pinède · ~1km · ☎ +33 4 93 61 16 74
-⭐ 4.4 · Spiaggia sabbiosa con bagnini e docce. Una delle rare spiagge sabbiose della zona. Acqua cristallina.
-Parc Exflora — Av. de Cannes · ~1,8km · ☎ +33 4 97 21 42 60
-⭐ 4.3 · Parco botanico con laghetto e fontana. Aperto 8:00–21:00 (9:00 nel weekend). Perfetto per una passeggiata mattutina.
-Baie des Milliardaires — Chemin des Douaniers · ~3km
-⭐ 4.5 · Caletta spettacolare con acque turchesi, uno degli scorci più belli di tutta la Riviera. Chiusa il lunedì.
-Office de Tourisme Antibes Juan-les-Pins — 60 Chemin des Sables · ~500m · ☎ +33 4 22 10 60 01
-⭐ 4.1 · Lun-Sab 9:30–12:30 / 14:00–18:00, Dom 9:00–13:00. Trovi tutte le info sul famoso Jazz à Juan (festival jazz estivo) e sulle escursioni in barca.
 
-💡 Nota utile per i tuoi ospiti: tutto il centro di Juan-les-Pins è raggiungibile a piedi dall'appartamento. I ristoranti migliori (Le J, Ti Toques, Le Bistrot) è consigliabile prenotarli in anticipo specialmente d'estate.
+Parc de la Pinède — 7 Bd de la Pinède · ~400m
+⭐ 4.6 · Parco aperto H24, con area giochi per bambini. Uno dei migliori parco-giochi della Costa Azzurra.
+
+Plage de Juan-les-Pins — Bd de la Pinède · ~1km · ☎ +33 4 93 61 16 74
+⭐ 4.4 · Spiaggia sabbiosa con bagnini e docce. Acqua cristallina.
+
+Parc Exflora — Av. de Cannes · ~1,8km · ☎ +33 4 97 21 42 60
+⭐ 4.3 · Parco botanico con laghetto e fontana. Aperto 8:00–21:00 (9:00 nel weekend).
+
+Baie des Milliardaires — Chemin des Douaniers · ~3km
+⭐ 4.5 · Caletta spettacolare con acque turchesi, uno degli scorci più belli della Riviera. Chiusa il lunedì.
+
+Office de Tourisme Antibes Juan-les-Pins — 60 Chemin des Sables · ~500m · ☎ +33 4 22 10 60 01
+⭐ 4.1 · Lun-Sab 9:30–12:30 / 14:00–18:00, Dom 9:00–13:00. Info su Jazz à Juan ed escursioni in barca.
+
+💡 Tutto il centro di Juan-les-Pins è raggiungibile a piedi dall'appartamento. I ristoranti migliori (Le J, Ti Toques, Le Bistrot) si consiglia di prenotarli in anticipo specialmente d'estate.
 
 TRASPORTI
 
 🚆 TRENO (TER / SNCF)
 Stazione più vicina: Gare de Juan-les-Pins (~1,2km a piedi) oppure Gare d'Antibes (~2,5km)
-Frequenza: fino a 87 treni al giorno — praticamente ogni 10-15 minuti nelle ore di punta
-Juan-les-Pins / Antibes → Nizza: ~20-25 minuti · da ~3€
-Juan-les-Pins / Antibes → Cannes: ~10-15 minuti · da ~3€
-Juan-les-Pins / Antibes → Monaco: ~50 minuti
+Frequenza: fino a 87 treni al giorno — ogni 10-15 min nelle ore di punta
+Juan-les-Pins / Antibes → Nizza: ~20-25 min · da ~3€
+Juan-les-Pins / Antibes → Cannes: ~10-15 min · da ~3€
+Juan-les-Pins / Antibes → Monaco: ~50 min
 Juan-les-Pins / Antibes → Marsiglia: ~2h30
 Orari e biglietti: sncf-connect.com oppure app SNCF Connect
-💡 Il treno è il mezzo più veloce e comodo per raggiungere Nizza e Cannes — molto più rapido dell'auto in estate.
+💡 Il treno è il mezzo più veloce e comodo per raggiungere Nizza e Cannes, molto più rapido dell'auto in estate.
 
 🚌 BUS URBANO (Envibus)
-Rete locale che copre Antibes, Juan-les-Pins, Sophia Antipolis e dintorni
+Rete locale: Antibes, Juan-les-Pins, Sophia Antipolis e dintorni
 Orari: dal lunedì al sabato 6:00–21:00 circa, domenica con servizio ridotto
 Frequenza: ogni 15-30 minuti sulle linee principali
 Linea A: collega Juan-les-Pins al centro di Antibes e alla stazione
 Biglietto singolo: ~1,50€ · si acquista sull'autobus o alle edicole
 Orari in tempo reale: envibus.fr oppure app Moovit
-💡 Utile per spostarsi nel centro di Antibes e raggiungere la stazione senza prendere l'auto.
 
 🚕 TAXI / VTC
 Numero taxi Antibes: +33 4 93 67 67 67
@@ -230,46 +261,18 @@ Distanza: ~25km da Juan-les-Pins
 In auto: ~25-30 min (senza traffico)
 In treno: Antibes → Nizza centro (~20 min) + bus navetta aeroporto (~8 min) = ~40 min totali
 In taxi: ~50-70€
-# Aggiunto il 01/05/2026
-Disponibile foto con parole chiave: pattumiera, trash can, poubelle, basura, mülltonne — descrizione: Qui il locale dove buttare la pattumiera
-# Aggiunto il 01/05/2026
-Disponibile foto con parole chiave: posto auto, parking, parkplatz, stationnement, estacionamiento, aparcamiento — descrizione: Questo il posto auto dove parcheggiare
-# Aggiunto il 01/05/2026
-Disponibile foto con parole chiave: ingresso, entrance, entrée, entrada, eingang — descrizione: Questo l’ingresso nello stabile
-# Aggiunto il 01/05/2026
-Disponibile foto con parole chiave: porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements — descrizione: Questa la porta di ingresso dell’appartamento
-# Aggiunto il 01/05/2026
-Disponibile foto con parole chiave: keybox, keybox, boite a cle, caja de llaves, schluesselkasten — descrizione: Qui dove si trova la keybox
-# Aggiunto il 10/05/2026
-Dove trovo la scopa: La trovi sul terrazzo uscendo sul lato destro
-# Aggiunto il 10/05/2026
-Dove trovo la scopa: La trovi sul terrazzo uscendo sul lato destro
-# Aggiunto il 10/05/2026
-Dove trovo il contatore luce: Il contatore si trova all’ingresso nello sportello bianco sulla sinistra prima della camera da letto
-# Aggiunto il 10/05/2026
-Dove trovo il contatore luce: Il contatore si trova all’ingresso nello sportello bianco sulla sinistra prima della camera da letto
-# Aggiunto il 10/05/2026
-Una volta parcheggiato come faccio a raggiungere l’appartamento: La porta per salire la trovi di fronte al parcheggio
-# Aggiunto il 10/05/2026
-Una volta parcheggiato come faccio a raggiungere l’appartamento: La porta per salire la trovi di fronte al parcheggio
-# Aggiunto il 10/05/2026
-Dove si trova l’ascensore?: Lo trovi di fronte al posto auto porta grigia
-# Aggiunto il 10/05/2026
-Dove si trova l’ascensore?: Lo trovi di fronte al posto auto porta grigia
-# Aggiunto il 10/05/2026
-Dove si trova la valvola dell’acqua? La Valvola dell’acqua si trova nel corridoio esterno, nel terzo sportello. La manopola è quella in basso a sinistra con la targhetta 23.
+
+ALTRE INFO UTILI
+Scopa: la trovi sul terrazzo uscendo sul lato destro
+Contatore luce: all'ingresso nello sportello bianco sulla sinistra prima della camera da letto
+Valvola dell'acqua: nel corridoio esterno, nel terzo sportello. Manopola in basso a sinistra con la targhetta 23.
+Ascensore: di fronte al posto auto, porta grigia
+Come salire all'appartamento dal parcheggio: la porta per salire la trovi di fronte al posto auto
 
 [MEDIA]
 keybox, keybox, boite a cle, caja de llaves, schluesselkasten = photo:AgACAgIAAxkBAAIC02n1CRzqGtbDUMFiJRzJNgWch3TsAALNFmsb-gOpS0bdN-CXWrsgAQADAgADeQADOwQ | Qui dove si trova la keybox
-porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements = photo:AgACAgIAAxkBAAICxGn1CDrtnZgvf5Ljqo9TrGM3jMaHAALKFmsb-gOpS4bNde530A-pAQADAgADeQADOwQ | Questa la porta di ingresso dell’appartamento
-ingresso, entrance, entrée, entrada, eingang = photo:AgACAgIAAxkBAAICvWn1B_rwuLRvTk6sDtCJNO0F0Du4AALJFmsb-gOpS3mDFlBXEPGGAQADAgADeQADOwQ | Questo l’ingresso nello stabile
+porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements = photo:AgACAgIAAxkBAAICxGn1CDrtnZgvf5Ljqo9TrGM3jMaHAALKFmsb-gOpS4bNde530A-pAQADAgADeQADOwQ | Questa la porta di ingresso dell'appartamento
+ingresso, entrance, entrée, entrada, eingang = photo:AgACAgIAAxkBAAICvWn1B_rwuLRvTk6sDtCJNO0F0Du4AALJFmsb-gOpS3mDFlBXEPGGAQADAgADeQADOwQ | Questo l'ingresso nello stabile
 posto auto, parking, parkplatz, stationnement, estacionamiento, aparcamiento = photo:AgACAgIAAxkBAAICtmn1B6XpVxsbEHXxGqK4etTWOAqLAALHFmsb-gOpSyZ8PBwW-D01AQADAgADeQADOwQ | Questo il posto auto dove parcheggiare
 pattumiera, trash can, poubelle, basura, mülltonne = photo:AgACAgIAAxkBAAICm2n1BGnNCsL7s8srs4-bayE8A6bVAAK1Fmsb-gOpS2_Cd-vh0fwLAQADAgADeQADOwQ | Qui il locale dove buttare la pattumiera
-# Formato: parole_chiave = tipo:file_id | Didascalia
-# tipo può essere: photo oppure video
-# Esempio (non attivo — sostituisci con i tuoi file_id reali):
-# box,garage,parcheggio,parking = photo:AgACAgQAAxkB... | 📍 Ecco come raggiungere il box!
-# chiavi,keybox,entrata,checkin = video:BAACAgQAAxkB... | 🔑 Come aprire la cassettina delle chiavi
-# spiaggia,beach,plage = photo:AgACAgQAAxkB... | 🏖 La spiaggia a 5 minuti a piedi!
-
-box,garage,parcheggio,parking = photo:AgACAgIAAxkBAANGaeFRBhLT5V-jUq5pi9jmFrKABUQAAs4Vaxuj2whLrrnwjvIoLqIBAAMCAAN5AAM7BA | Ecco come raggiungere il box!
+box, garage, parcheggio, parking = photo:AgACAgIAAxkBAANGaeFRBhLT5V-jUq5pi9jmFrKABUQAAs4Vaxuj2whLrrnwjvIoLqIBAAMCAAN5AAM7BA | Ecco come raggiungere il box!
