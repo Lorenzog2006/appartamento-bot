@@ -219,6 +219,28 @@ def _topic_di(testo):
             return topic
     return "altro"
 
+def is_paused(chat_id):
+    """True se la AI e' in pausa per questo cliente."""
+    try:
+        _carica_users_da_github()
+        u = _users.get(str(chat_id), {})
+        return bool(u.get("pausa_ai"))
+    except Exception:
+        return False
+
+def set_pause(chat_id, paused):
+    """Attiva/disattiva pausa AI per un cliente specifico."""
+    try:
+        _carica_users_da_github()
+        cid = str(chat_id)
+        if cid not in _users:
+            _users[cid] = {"canale": "telegram" if not cid.startswith("wa_") else "whatsapp"}
+        _users[cid]["pausa_ai"] = bool(paused)
+        _salva_users_su_github()
+        return True
+    except Exception:
+        return False
+
 def aggiorna_user(chat_id, canale, nome, testo, lingua=None, username=None):
     """Aggiorna i metadati cumulativi del cliente. Best-effort, non blocca il bot."""
     try:
@@ -1270,6 +1292,20 @@ def webhook():
             elif cb_data == "DEL_MEDIA_CANCEL":
                 modifica_messaggio(cb_chat_id, cb_msg_id, "✅ Annullato. Nessun media è stato cancellato.")
 
+            # ── Pausa AI da bottone notifica ──
+            elif cb_data.startswith("PAUSA:"):
+                target = cb_data.split(":", 1)[1]
+                ok = set_pause(target, True)
+                suffisso = f"\n\n⏸️ *Pausa AI attivata* per `{target}`" if ok else "\n\n❌ Errore"
+                modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
+
+            # ── Riattiva AI ──
+            elif cb_data.startswith("RIPRENDI:"):
+                target = cb_data.split(":", 1)[1]
+                ok = set_pause(target, False)
+                suffisso = f"\n\n▶️ *AI riattivata* per `{target}`" if ok else "\n\n❌ Errore"
+                modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
+
             return "ok"
 
         # ── Messaggi normali ────────────────────────────────────────────────
@@ -1449,6 +1485,44 @@ def webhook():
             )
             return "ok"
 
+        # ── /pausa <chat_id> ── disattiva AI per un cliente ──
+        if testo.startswith("/pausa") and is_owner:
+            parti = testo.split(" ", 1)
+            if len(parti) < 2:
+                invia_messaggio(chat_id,
+                    "⏸️ *Pausa AI*\n\nUso: `/pausa <chat_id>`\n\n"
+                    "Esempi:\n"
+                    "• `/pausa 8668813727` (Telegram)\n"
+                    "• `/pausa wa_393201234567` (WhatsApp)\n\n"
+                    "Trovi il chat_id nelle notifiche dei messaggi: `[ID:...]` o `[WA:...]`",
+                    parse_mode="Markdown"
+                )
+                return "ok"
+            target = parti[1].strip()
+            if set_pause(target, True):
+                invia_messaggio(chat_id,
+                    f"⏸️ Pausa AI attivata per `{target}`\n\n"
+                    f"Il bot non risponderà più automaticamente. I messaggi continueranno ad arrivarti come notifica.\n\n"
+                    f"Per riattivare: `/riprendi {target}`",
+                    parse_mode="Markdown"
+                )
+            else:
+                invia_messaggio(chat_id, f"❌ Errore nell'attivazione pausa per {target}")
+            return "ok"
+
+        # ── /riprendi <chat_id> ── riattiva AI per un cliente ──
+        if testo.startswith("/riprendi") and is_owner:
+            parti = testo.split(" ", 1)
+            if len(parti) < 2:
+                invia_messaggio(chat_id, "▶️ Uso: `/riprendi <chat_id>`", parse_mode="Markdown")
+                return "ok"
+            target = parti[1].strip()
+            if set_pause(target, False):
+                invia_messaggio(chat_id, f"▶️ AI riattivata per `{target}`", parse_mode="Markdown")
+            else:
+                invia_messaggio(chat_id, f"❌ Errore")
+            return "ok"
+
         # ── /dashboard ── manda link sicuro alla dashboard web ──
         if testo == "/dashboard" and is_owner:
             if not DASHBOARD_KEY:
@@ -1563,6 +1637,21 @@ def webhook():
                 invia_messaggio(chat_id, ERRORE_DATE.get(lingua, ERRORE_DATE["english"]), remove_kb=True)
                 return "ok"
 
+        # ── Pausa AI: notifica Lorenzo e basta, non rispondere ──
+        if not is_owner and is_paused(chat_id):
+            if OWNER_ID:
+                nome_display = f"@{username}" if username else nome
+                invia_bottoni(int(OWNER_ID),
+                    f"⏸️ *[PAUSA]* {nome_display}\n\n❓ {testo}\n\n[ID:{chat_id}]",
+                    [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{chat_id}"}]],
+                    parse_mode="Markdown"
+                )
+            try:
+                aggiorna_user(chat_id, "telegram", nome, testo, rileva_lingua(testo), username)
+            except Exception:
+                pass
+            return "ok"
+
         # ── Risposta AI ─────────────────────────────────────────────────────
         try:
             info  = leggi_info()
@@ -1637,8 +1726,9 @@ def webhook():
                         f"👆 Premi Rispondi per contattarlo direttamente."
                     )
                 else:
-                    invia_messaggio(int(OWNER_ID),
-                        f"📩 {nome_display} [ID:{chat_id}]\n\n❓ {testo}\n\n🤖 {reply}"
+                    invia_bottoni(int(OWNER_ID),
+                        f"📩 {nome_display} [ID:{chat_id}]\n\n❓ {testo}\n\n🤖 {reply}",
+                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]]
                     )
             except Exception:
                 pass
@@ -2687,6 +2777,23 @@ def whatsapp_webhook():
         # Chiave sessione WhatsApp separata da Telegram
         wa_session_id = f"wa_{wa_from}"
 
+        # Pausa AI: notifica Lorenzo e basta, non rispondere
+        if is_paused(wa_session_id):
+            if OWNER_ID:
+                try:
+                    invia_bottoni(int(OWNER_ID),
+                        f"⏸️ *[PAUSA WA]* {nome}\n\n❓ {testo}\n\n[WA:{wa_from}]",
+                        [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{wa_session_id}"}]],
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+            try:
+                aggiorna_user(wa_session_id, "whatsapp", nome, testo, rileva_lingua(testo), None)
+            except Exception:
+                pass
+            return "ok"
+
         # Primo messaggio → invia benvenuto prima della risposta AI
         storia_wa = get_storia(wa_session_id)
         if not storia_wa:
@@ -2725,8 +2832,10 @@ def whatsapp_webhook():
         # Notifica Lorenzo su Telegram (con [WA:...] per permettere reply diretto)
         if OWNER_ID:
             try:
-                invia_messaggio(int(OWNER_ID),
-                    f"📱 *WhatsApp* — {nome}\n\n❓ {testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]"
+                invia_bottoni(int(OWNER_ID),
+                    f"📱 *WhatsApp* — {nome}\n\n❓ {testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]",
+                    [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}]],
+                    parse_mode="Markdown"
                 )
             except Exception:
                 pass
