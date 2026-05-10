@@ -1680,6 +1680,134 @@ def health():
     return "Bot attivo! ✓"
 
 
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+def _check_dash_key():
+    """Verifica chiave dashboard. Ritorna True se valida, False altrimenti."""
+    if not DASHBOARD_KEY:
+        return False
+    return request.args.get("key", "") == DASHBOARD_KEY
+
+def _aggrega_dashboard_data():
+    """Aggrega tutti i dati per la dashboard. Best-effort, niente errori che bloccano."""
+    from flask import jsonify
+    out = {
+        "kpi": {"totale_lifetime": 0, "totale_oggi": 0, "ospiti_attivi": 0, "totale_clienti": 0},
+        "lingue": {}, "argomenti": {},
+        "prenotazioni_correnti": [], "prenotazioni_prossime": [], "prenotazioni_passate": [],
+        "conversazioni_attive": [], "top_clienti": [],
+        "media": [], "generato_il": datetime.now().strftime("%d/%m/%Y %H:%M")
+    }
+    # 1. Stats lifetime + oggi
+    try:
+        s, _ = carica_stats()
+        out["kpi"]["totale_lifetime"] = s.get("totale", 0)
+        out["lingue"] = s.get("lingue", {})
+        out["argomenti"] = s.get("argomenti", {})
+    except Exception:
+        pass
+    try:
+        ds, _ = carica_daily_stats()
+        oggi_str = datetime.now().strftime("%d/%m/%Y")
+        if ds.get("data") == oggi_str:
+            out["kpi"]["totale_oggi"] = ds.get("totale", 0)
+    except Exception:
+        pass
+    # 2. Prenotazioni
+    try:
+        prenotazioni, _ = carica_prenotazioni()
+        oggi = datetime.now()
+        for cid, p in prenotazioni.items():
+            try:
+                ci_d = datetime.strptime(p["checkin"], "%d/%m/%Y")
+                co_d = datetime.strptime(p["checkout"], "%d/%m/%Y")
+                row = {"chat_id": cid, **p}
+                if co_d < oggi:
+                    out["prenotazioni_passate"].append(row)
+                elif ci_d <= oggi <= co_d:
+                    out["prenotazioni_correnti"].append(row)
+                else:
+                    out["prenotazioni_prossime"].append(row)
+            except Exception:
+                pass
+        # ordina prossime per data ascendente
+        out["prenotazioni_prossime"].sort(key=lambda r: datetime.strptime(r.get("checkin","31/12/2099"), "%d/%m/%Y"))
+        out["prenotazioni_passate"].sort(key=lambda r: datetime.strptime(r.get("checkout","01/01/2000"), "%d/%m/%Y"), reverse=True)
+    except Exception:
+        pass
+    # 3. Conversazioni attive (storia ultime 24h)
+    try:
+        _carica_conversazioni_da_github()
+        ora = datetime.now().timestamp()
+        for cid, conv in _conversazioni.items():
+            ultimo = conv.get("ultimo", 0)
+            if ora - ultimo > 24 * 3600:
+                continue
+            canale = "whatsapp" if cid.startswith("wa_") else "telegram"
+            ultimo_dt = datetime.fromtimestamp(ultimo).strftime("%d/%m %H:%M")
+            n_msg = len(conv.get("storia", [])) // 2
+            # Trova nome utente
+            u = _users.get(cid, {}) if _users_loaded else {}
+            nome = u.get("nome", "?")
+            out["conversazioni_attive"].append({
+                "chat_id": cid, "canale": canale, "nome": nome,
+                "ultimo_msg": ultimo_dt, "msg_in_storia": n_msg,
+                "ultimo_ts": ultimo
+            })
+        out["conversazioni_attive"].sort(key=lambda x: x["ultimo_ts"], reverse=True)
+    except Exception:
+        pass
+    # 4. Top clienti per attività
+    try:
+        _carica_users_da_github()
+        out["kpi"]["totale_clienti"] = len(_users)
+        clienti = []
+        for cid, u in _users.items():
+            clienti.append({
+                "chat_id": cid,
+                "canale": u.get("canale", "?"),
+                "nome": u.get("nome", "?"),
+                "username": u.get("username", ""),
+                "totale_msg": u.get("totale_msg", 0),
+                "primo_msg": u.get("primo_msg", ""),
+                "ultimo_msg": u.get("ultimo_msg", ""),
+                "lingua": u.get("lingua", ""),
+                "topic_top": max(u.get("topic_count", {}).items(), key=lambda x: x[1])[0] if u.get("topic_count") else "—"
+            })
+        clienti.sort(key=lambda x: x["totale_msg"], reverse=True)
+        out["top_clienti"] = clienti[:20]
+        # ospiti_attivi = clienti con ultimo_msg negli ultimi 7gg
+        ora_iso = datetime.now()
+        attivi = 0
+        for u in _users.values():
+            try:
+                ult = datetime.strptime(u.get("ultimo_msg", "")[:19], "%Y-%m-%dT%H:%M:%S")
+                if (ora_iso - ult).total_seconds() < 7 * 86400:
+                    attivi += 1
+            except Exception:
+                pass
+        out["kpi"]["ospiti_attivi"] = attivi
+    except Exception:
+        pass
+    # 5. Media salvati
+    try:
+        for i, m in enumerate(leggi_media(), 1):
+            out["media"].append({
+                "n": i, "tipo": m["tipo"],
+                "keywords": ", ".join(m["keywords"][:6]),
+                "caption": (m.get("caption") or "")[:120]
+            })
+    except Exception:
+        pass
+    return out
+
+@app.route("/dashboard/api/data")
+def dashboard_api_data():
+    if not _check_dash_key():
+        return ("Forbidden", 403)
+    from flask import jsonify
+    return jsonify(_aggrega_dashboard_data())
+
+
 @app.route("/privacy")
 def privacy_policy():
     html = """<!DOCTYPE html>
