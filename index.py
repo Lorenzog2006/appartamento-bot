@@ -1700,6 +1700,89 @@ def _check_dash_key():
         return False
     return request.args.get("key", "") == DASHBOARD_KEY
 
+def costi_meta(giorni=30):
+    """Recupera analytics conversazioni WhatsApp degli ultimi N giorni e calcola costo."""
+    if not (WA_TOKEN and WA_PHONE_ID):
+        return {"errore": "WA_TOKEN o WA_PHONE_ID mancanti", "costo_eur": 0, "conv_per_categoria": {}}
+    waba_id = "1476202720613528"
+    end_ts = int(datetime.now().timestamp())
+    start_ts = end_ts - giorni * 86400
+    try:
+        # Endpoint Meta: conversation_analytics con dimensione CONVERSATION_CATEGORY
+        url = (
+            f"https://graph.facebook.com/v22.0/{waba_id}"
+            f"?fields=conversation_analytics.start({start_ts}).end({end_ts})"
+            f".granularity(DAILY).dimensions(%5B%22CONVERSATION_CATEGORY%22%5D)"
+        )
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {WA_TOKEN}"})
+        r = urllib.request.urlopen(req, timeout=8)
+        data = json.loads(r.read())
+        analytics = data.get("conversation_analytics", {}).get("data", [])
+        per_cat = {}
+        if analytics:
+            for dp in analytics[0].get("data_points", []):
+                cat = dp.get("conversation_category", "UNKNOWN")
+                per_cat[cat] = per_cat.get(cat, 0) + int(dp.get("conversation", 0))
+        # Tariffe approssimative Italia 2025-2026 (€/conversazione)
+        rates = {
+            "MARKETING": 0.0691,
+            "UTILITY": 0.0341,
+            "AUTHENTICATION": 0.0341,
+            "SERVICE": 0.0,  # gratis dal 2024
+        }
+        costo = 0.0
+        for cat, n in per_cat.items():
+            costo += n * rates.get(cat, 0)
+        return {
+            "giorni": giorni,
+            "conv_per_categoria": per_cat,
+            "totale_conv": sum(per_cat.values()),
+            "costo_eur": round(costo, 4)
+        }
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8")[:200]
+        except Exception:
+            pass
+        return {"errore": f"HTTP {e.code}: {body}", "costo_eur": 0, "conv_per_categoria": {}}
+    except Exception as e:
+        return {"errore": str(e)[:200], "costo_eur": 0, "conv_per_categoria": {}}
+
+
+def costi_claude_stimati(giorni=30):
+    """Stima costi Claude basata sui messaggi tracciati negli ultimi N giorni."""
+    try:
+        _carica_users_da_github()
+    except Exception:
+        pass
+    ora = datetime.now()
+    msg_recenti = 0
+    msg_lifetime = 0
+    for u in _users.values():
+        msg_lifetime += int(u.get("totale_msg", 0))
+        try:
+            ult = datetime.strptime((u.get("ultimo_msg", "") or "")[:19], "%Y-%m-%dT%H:%M:%S")
+            if (ora - ult).days <= giorni:
+                # approx: tutti i suoi messaggi sono nei recenti
+                # (errore +-5% se cliente ha scritto sia recente che vecchio)
+                msg_recenti += int(u.get("totale_msg", 0))
+        except Exception:
+            pass
+    # Stima Sonnet 4.6: input 5000 tok ($3/M) + output 500 tok ($15/M) = $0.022/msg ≈ €0.020
+    costo_msg_eur = 0.020
+    return {
+        "giorni": giorni,
+        "messaggi_recenti": msg_recenti,
+        "messaggi_lifetime": msg_lifetime,
+        "costo_recenti_eur": round(msg_recenti * costo_msg_eur, 4),
+        "costo_lifetime_eur": round(msg_lifetime * costo_msg_eur, 4),
+        "modello": "claude-sonnet-4-6",
+        "costo_per_msg": costo_msg_eur,
+        "nota": "Stima: ~5k tok input + 500 tok output per msg ($3 + $15 per 1M tok)"
+    }
+
+
 def _aggrega_dashboard_data():
     """Aggrega tutti i dati per la dashboard. Best-effort, niente errori che bloccano."""
     from flask import jsonify
@@ -1813,12 +1896,38 @@ def _aggrega_dashboard_data():
         pass
     return out
 
+
+def _aggrega_costi():
+    """Aggrega tutti i costi (Meta + Claude stimati) per la sezione Costi."""
+    meta = costi_meta(30)
+    claude = costi_claude_stimati(30)
+    totale = round(meta.get("costo_eur", 0) + claude.get("costo_recenti_eur", 0), 2)
+    return {
+        "meta": meta,
+        "claude": claude,
+        "groq": {"costo_eur": 0, "nota": "Free tier: 14400 req/giorno gratuiti"},
+        "telegram": {"costo_eur": 0, "nota": "Bot API completamente gratuita"},
+        "github": {"costo_eur": 0, "nota": "Repo privato — gratuito"},
+        "vercel": {"costo_eur": 0, "nota": "Hobby tier — gratuito"},
+        "totale_eur": totale,
+        "periodo_giorni": 30,
+        "generato_il": datetime.now().strftime("%d/%m/%Y %H:%M")
+    }
+
 @app.route("/dashboard/api/data")
 def dashboard_api_data():
     if not _check_dash_key():
         return ("Forbidden", 403)
     from flask import jsonify
     return jsonify(_aggrega_dashboard_data())
+
+
+@app.route("/dashboard/api/costi")
+def dashboard_api_costi():
+    if not _check_dash_key():
+        return ("Forbidden", 403)
+    from flask import jsonify
+    return jsonify(_aggrega_costi())
 
 
 @app.route("/dashboard/conversation/<path:chat_id>")
@@ -1941,9 +2050,9 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   border-radius:30px;padding:10px 8px;display:flex;gap:6px;box-shadow:0 4px 24px rgba(0,0,0,.5);
   border:1px solid rgba(255,255,255,.08);z-index:100;
 }
-.tab{background:transparent;border:0;color:rgba(255,255,255,.55);padding:8px 18px;border-radius:24px;cursor:pointer;font-size:12.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:70px}
+.tab{background:transparent;border:0;color:rgba(255,255,255,.55);padding:7px 11px;border-radius:24px;cursor:pointer;font-size:11.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:58px}
 .tab.active{color:var(--accent);background:rgba(34,197,94,.15)}
-.tab .ti{font-size:18px}
+.tab .ti{font-size:17px}
 .view{display:none;animation:fadeIn .2s ease}
 .view.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -1977,6 +2086,20 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .cli-count{flex-shrink:0;text-align:right;min-width:48px}
 .cli-num{font-size:22px;font-weight:800;color:#fff;line-height:1}
 .cli-lbl{font-size:10.5px;color:var(--txt-mute);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.costi-tot{background:radial-gradient(120% 100% at 100% 100%,#16704a 0%,#0f4a30 50%,#0a2418 100%);border-radius:22px;padding:24px;text-align:center;margin-bottom:8px;box-shadow:0 2px 12px rgba(0,0,0,.6)}
+.costi-tot .v{font-size:42px;font-weight:800;color:#fff;line-height:1.05}
+.costi-tot .l{font-size:12px;color:rgba(255,255,255,.75);margin-top:6px;text-transform:uppercase;letter-spacing:.5px}
+.cost-row{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.04);border-radius:14px;padding:14px 14px;margin-bottom:8px}
+.cost-row .ic{font-size:22px;flex-shrink:0}
+.cost-row .info{flex:1;min-width:0}
+.cost-row .nm{font-size:14px;font-weight:600;color:#fff}
+.cost-row .nt{font-size:11.5px;color:var(--txt-mute);margin-top:3px}
+.cost-row .pr{font-size:18px;font-weight:700;color:#fff;flex-shrink:0;text-align:right;min-width:80px}
+.cost-row .pr.zero{color:var(--accent)}
+.costi-note{background:rgba(255,255,255,.04);border-radius:14px;padding:14px;font-size:12px;line-height:1.55;color:var(--txt-mute)}
+.cat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:6px;font-size:13px}
+.cat-row .free{color:var(--accent);font-weight:600}
+.cat-row .paid{color:#f7c84a;font-weight:600}
 </style>
 </head>
 <body>
@@ -2012,6 +2135,18 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   <div id="prenPassate"></div>
 </div>
 
+<!-- VIEW 5: COSTI -->
+<div class="view" id="view-costi">
+  <div class="section">Costi servizi (ultimi 30 giorni)</div>
+  <div id="costiTotale"></div>
+  <div class="section">Dettaglio per servizio</div>
+  <div id="costiList"></div>
+  <div class="section">WhatsApp — conversazioni per categoria</div>
+  <div id="costiMetaCat"></div>
+  <div class="section">Note</div>
+  <div class="costi-note" id="costiNote"></div>
+</div>
+
 <!-- VIEW 4: PANORAMICA -->
 <div class="view" id="view-stats">
   <div class="section">Panoramica</div>
@@ -2029,9 +2164,10 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 <!-- Bottom tab bar -->
 <nav class="tabs">
   <button class="tab active" data-view="clienti"><span class="ti">👥</span>Clienti</button>
-  <button class="tab" data-view="argomenti"><span class="ti">💡</span>Argomenti</button>
+  <button class="tab" data-view="argomenti"><span class="ti">💡</span>Argom.</button>
   <button class="tab" data-view="prenotazioni"><span class="ti">📅</span>Prenot.</button>
   <button class="tab" data-view="stats"><span class="ti">📊</span>Stats</button>
+  <button class="tab" data-view="costi"><span class="ti">💰</span>Costi</button>
 </nav>
 
 <!-- Modale dettaglio cliente -->
@@ -2207,6 +2343,72 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   window.scrollTo(0,0);
 }));
 
+function fmtEur(v){
+  if(v==null||isNaN(v))return '—';
+  if(v===0)return '0,00 €';
+  return v.toLocaleString('it-IT',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:4});
+}
+
+let COSTI=null;
+async function caricaCosti(){
+  try{
+    const r=await fetch('/dashboard/api/costi?key='+encodeURIComponent(KEY));
+    if(!r.ok)return;
+    COSTI=await r.json();
+    renderCosti();
+  }catch(e){
+    document.getElementById('costiList').innerHTML='<div class="empty">Errore caricamento costi: '+escapeHtml(e.message)+'</div>';
+  }
+}
+
+function renderCosti(){
+  if(!COSTI)return;
+  // Totale grande
+  document.getElementById('costiTotale').innerHTML=
+    `<div class="costi-tot"><div class="v">${fmtEur(COSTI.totale_eur||0)}</div><div class="l">Totale stimato — ultimi ${COSTI.periodo_giorni} giorni</div></div>`;
+  // Lista servizi
+  const m=COSTI.meta||{}, c=COSTI.claude||{};
+  const servizi=[
+    ['📱','WhatsApp Cloud API (Meta)', m.errore?'⚠️ '+m.errore:`${m.totale_conv||0} conversazioni totali`, m.costo_eur||0],
+    ['🤖','Claude API (Anthropic)', `~${c.messaggi_recenti||0} msg · ${c.modello||''}`, c.costo_recenti_eur||0],
+    ['🆓','Groq (fallback)', (COSTI.groq||{}).nota||'', 0],
+    ['💬','Telegram Bot API', (COSTI.telegram||{}).nota||'', 0],
+    ['💾','GitHub (storage dati)', (COSTI.github||{}).nota||'', 0],
+    ['☁️','Vercel (hosting)', (COSTI.vercel||{}).nota||'', 0]
+  ];
+  document.getElementById('costiList').innerHTML=servizi.map(([i,n,nt,p])=>
+    `<div class="cost-row">
+      <div class="ic">${i}</div>
+      <div class="info"><div class="nm">${escapeHtml(n)}</div><div class="nt">${escapeHtml(nt)}</div></div>
+      <div class="pr ${p===0?'zero':''}">${fmtEur(p)}</div>
+    </div>`).join('');
+  // Categorie WhatsApp
+  const cats=m.conv_per_categoria||{};
+  const elemCat=document.getElementById('costiMetaCat');
+  if(Object.keys(cats).length){
+    const labels={
+      "SERVICE":"🆓 Service (cliente scrive primo)",
+      "MARKETING":"💸 Marketing (tu inizi promo)",
+      "UTILITY":"🔔 Utility (tu confermi/notifichi)",
+      "AUTHENTICATION":"🔐 Authentication (OTP)",
+      "FREE_ENTRY_POINT":"🆓 Free entry point",
+      "FREE_TIER":"🆓 Free tier"
+    };
+    const free=['SERVICE','FREE_ENTRY_POINT','FREE_TIER'];
+    elemCat.innerHTML=Object.entries(cats).map(([k,v])=>{
+      const isFree=free.includes(k);
+      return `<div class="cat-row"><span>${labels[k]||escapeHtml(k)}</span><span class="${isFree?'free':'paid'}">${v} conv${isFree?' (gratis)':''}</span></div>`;
+    }).join('');
+  }else{
+    elemCat.innerHTML='<div class="empty">Nessuna conversazione negli ultimi 30 giorni.</div>';
+  }
+  // Note
+  document.getElementById('costiNote').innerHTML=
+    `<p><b>Stima Claude:</b> ${escapeHtml(c.nota||'')}</p>
+     <p style="margin-top:8px"><b>Tariffe Meta Italia 2025:</b> Marketing ~€0,069/conv · Utility ~€0,034/conv · Service gratis illimitato</p>
+     <p style="margin-top:8px;font-size:11px;opacity:.7">⚠️ I valori sono stime — Meta fattura mensilmente al CMC effettivo, possono variare di pochi centesimi.</p>`;
+}
+
 async function caricaDati(){
   document.getElementById('aggiornata').textContent='⏳ Caricamento...';
   try{
@@ -2218,7 +2420,8 @@ async function caricaDati(){
   }catch(e){document.getElementById('aggiornata').textContent='❌ '+e.message}
 }
 caricaDati();
-setInterval(caricaDati,60000);
+caricaCosti();
+setInterval(()=>{caricaDati();caricaCosti()},60000);
 </script>
 </body>
 </html>"""
