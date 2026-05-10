@@ -1,9 +1,10 @@
 from http.server import BaseHTTPRequestHandler
 import json, os, urllib.request
 
-TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROQ_KEY = os.environ.get("GROQ_API_KEY")
-OWNER_ID = os.environ.get("OWNER_CHAT_ID")
+TOKEN         = os.environ.get("TELEGRAM_TOKEN")
+GROQ_KEY      = os.environ.get("GROQ_API_KEY")
+ANTHROPIC_KEY = os.environ.get("ANTHROPIC_KEY")
+OWNER_ID      = os.environ.get("OWNER_CHAT_ID")
 
 INFO_PATH = os.path.join(os.path.dirname(__file__), "..", "appartamento.txt")
 
@@ -23,35 +24,50 @@ def leggi_info():
         return "Informazioni appartamento non disponibili."
 
 
+SYSTEM_PROMPT = (
+    "Sei un assistente virtuale per un appartamento in affitto su Booking e Airbnb. "
+    "Rispondi SOLO con le informazioni qui sotto. "
+    "ATTENZIONE AI NUMERI: cita ogni numero ESATTAMENTE come appare nel testo. "
+    "Se non hai l'informazione richiesta, di' che contatterai Lorenzo al più presto. "
+    "Rispondi nella stessa lingua dell'ospite. Sii cordiale e conciso. "
+    "Aggiungi 1-2 emoji coerenti con l'argomento.\n\n"
+    "INFORMAZIONI APPARTAMENTO:\n{info}"
+)
+
 def chiedi_ai(domanda, info):
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Sei un assistente virtuale per un appartamento in affitto su Booking e Airbnb. "
-                    "Rispondi SOLO con le informazioni qui sotto. "
-                    "Se non hai l'informazione richiesta, di' che contatterai il proprietario al più presto. "
-                    "Rispondi nella stessa lingua dell'ospite. Sii cordiale e conciso.\n\n"
-                    f"INFORMAZIONI APPARTAMENTO:\n{info}"
-                )
-            },
-            {"role": "user", "content": domanda}
-        ]
-    }
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        url, data=data,
-        headers={
+    system_text = SYSTEM_PROMPT.format(info=info[:12000])
+    try:
+        # Claude Sonnet 4.6 (preferito)
+        url = "https://api.anthropic.com/v1/messages"
+        payload = {
+            "model": "claude-sonnet-4-6",
+            "max_tokens": 1024,
+            "system": system_text,
+            "messages": [{"role": "user", "content": domanda}]
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
+            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_KEY,
+            "anthropic-version": "2023-06-01"
+        })
+        r = urllib.request.urlopen(req, timeout=20)
+        return json.loads(r.read())["content"][0]["text"]
+    except Exception:
+        # Fallback Groq
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": system_text},
+                {"role": "user", "content": domanda}
+            ]
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {GROQ_KEY}"
-        }
-    )
-    r = urllib.request.urlopen(req, timeout=25)
-    result = json.loads(r.read())
-    return result["choices"][0]["message"]["content"]
+        })
+        r = urllib.request.urlopen(req, timeout=25)
+        return json.loads(r.read())["choices"][0]["message"]["content"]
 
 
 class handler(BaseHTTPRequestHandler):
