@@ -313,6 +313,65 @@ def trova_media(domanda):
 
 
 # ── GitHub: Media ─────────────────────────────────────────────────────────────
+def cancella_media_su_github(indice_1based):
+    """Cancella la riga N (1-based) dalla sezione [MEDIA] di appartamento.txt."""
+    if not GITHUB_TOKEN:
+        return None
+    try:
+        req = urllib.request.Request(GITHUB_API, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(r.read())
+        sha = data["sha"]
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+
+        if "[MEDIA]" not in contenuto:
+            return None
+
+        testo_parte, media_parte = contenuto.split("[MEDIA]", 1)
+        # Estrai righe valide (con "=") e ricostruisci
+        righe_orig = media_parte.split("\n")
+        righe_media = []      # [(idx_originale, riga)]
+        for i, riga in enumerate(righe_orig):
+            r_strip = riga.strip()
+            if r_strip and not r_strip.startswith("#") and "=" in r_strip:
+                righe_media.append((i, riga))
+
+        if indice_1based < 1 or indice_1based > len(righe_media):
+            return None
+
+        # Rimuovi la riga dall'array originale
+        idx_da_rimuovere = righe_media[indice_1based - 1][0]
+        riga_rimossa = righe_orig[idx_da_rimuovere].strip()
+        del righe_orig[idx_da_rimuovere]
+        nuovo_media_parte = "[MEDIA]" + "\n".join(righe_orig)
+        contenuto_nuovo = testo_parte.rstrip() + "\n\n" + nuovo_media_parte
+
+        payload = {
+            "message": f"Bot cancella media #{indice_1based}",
+            "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+            "sha": sha
+        }
+        req = urllib.request.Request(GITHUB_API, data=json.dumps(payload).encode(), headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        }, method="PUT")
+        urllib.request.urlopen(req, timeout=15)
+        invalida_cache()
+        return riga_rimossa
+    except Exception as e:
+        try:
+            log_errore("cancella_media", e)
+        except Exception:
+            pass
+        return None
+
+
 def salva_media_su_github(keywords, tipo, file_id, caption):
     if not GITHUB_TOKEN:
         return False
@@ -1221,6 +1280,49 @@ def webhook():
                 invia_messaggio(chat_id, formatta_stats(), parse_mode="Markdown")
             except Exception as e:
                 invia_messaggio(chat_id, f"Errore stats: {e}")
+            return "ok"
+
+        # ── /listamedia ── elenca tutti i media salvati ──
+        if testo == "/listamedia" and is_owner:
+            try:
+                media_list = leggi_media()
+                if not media_list:
+                    invia_messaggio(chat_id, "📭 Nessun media salvato.")
+                    return "ok"
+                righe = ["📸 *Media salvati:*\n"]
+                for i, m in enumerate(media_list, 1):
+                    icona = "🎬" if m["tipo"] == "video" else "📸"
+                    keywords = ", ".join(m["keywords"][:5])
+                    if len(m["keywords"]) > 5:
+                        keywords += f" (+{len(m['keywords'])-5})"
+                    caption = m.get("caption", "").strip()
+                    riga = f"*{i}.* {icona} _{keywords}_"
+                    if caption:
+                        riga += f"\n   📝 {caption[:80]}{'...' if len(caption) > 80 else ''}"
+                    righe.append(riga)
+                righe.append("\n💡 Per cancellare: `/cancellamedia N`")
+                invia_messaggio(chat_id, "\n\n".join(righe), parse_mode="Markdown")
+            except Exception as e:
+                invia_messaggio(chat_id, f"❌ Errore: {e}")
+            return "ok"
+
+        # ── /cancellamedia N ── cancella il media #N ──
+        if testo.startswith("/cancellamedia") and is_owner:
+            parti = testo.split()
+            if len(parti) < 2 or not parti[1].isdigit():
+                invia_messaggio(chat_id,
+                    "❓ Uso: `/cancellamedia N`\nDove N è il numero che vedi con /listamedia",
+                    parse_mode="Markdown"
+                )
+                return "ok"
+            indice = int(parti[1])
+            invia_messaggio(chat_id, f"⏳ Cancellazione media #{indice} in corso...")
+            riga_rimossa = cancella_media_su_github(indice)
+            if riga_rimossa:
+                anteprima = riga_rimossa[:120] + ("..." if len(riga_rimossa) > 120 else "")
+                invia_messaggio(chat_id, f"✅ Media #{indice} cancellato!\n\n`{anteprima}`", parse_mode="Markdown")
+            else:
+                invia_messaggio(chat_id, f"❌ Non ho trovato il media #{indice}.\nUsa /listamedia per vedere i numeri validi.")
             return "ok"
 
         # ── /rispondi ──
