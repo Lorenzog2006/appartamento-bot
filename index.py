@@ -1808,6 +1808,158 @@ def dashboard_api_data():
     return jsonify(_aggrega_dashboard_data())
 
 
+@app.route("/dashboard")
+def dashboard_page():
+    if not _check_dash_key():
+        return ("Forbidden — chiave mancante o errata", 403)
+    from flask import Response
+    key = request.args.get("key", "")
+    html = """<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Bot Appartamento</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:#f5f7fa;color:#222;padding:20px;max-width:1200px;margin:0 auto}
+h1{color:#0066cc;margin-bottom:8px;font-size:24px}
+.sub{color:#888;font-size:13px;margin-bottom:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+.kpi{background:#fff;padding:16px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,.06);text-align:center}
+.kpi .num{font-size:28px;font-weight:700;color:#0066cc}
+.kpi .lbl{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 2px 4px rgba(0,0,0,.06)}
+.card h2{font-size:16px;margin-bottom:12px;color:#333;border-bottom:1px solid #eee;padding-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:8px 6px;background:#f8f9fa;font-weight:600;color:#555;font-size:12px;text-transform:uppercase}
+td{padding:8px 6px;border-bottom:1px solid #f0f0f0}
+tr:hover td{background:#f9fafc}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.b-tg{background:#dbeafe;color:#1e40af}
+.b-wa{background:#dcfce7;color:#166534}
+.b-cur{background:#fef3c7;color:#92400e}
+.b-fut{background:#dbeafe;color:#1e40af}
+.b-past{background:#f3f4f6;color:#6b7280}
+.empty{color:#999;font-style:italic;text-align:center;padding:20px}
+.refresh{float:right;background:#0066cc;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+a{color:#0066cc;text-decoration:none}
+a:hover{text-decoration:underline}
+@media(max-width:720px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>🏠 Dashboard — Bot Appartamento Juan les Pins
+<button class="refresh" onclick="caricaDati()">🔄 Aggiorna</button></h1>
+<div class="sub" id="aggiornata">Caricamento...</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="row">
+  <div class="card"><h2>📊 Argomenti più richiesti</h2><canvas id="grafTopic"></canvas></div>
+  <div class="card"><h2>🌍 Lingue</h2><canvas id="grafLingue"></canvas></div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h2>💬 Conversazioni attive (ultime 24h)</h2>
+  <div id="conversazioni"></div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h2>👥 Top clienti per attività</h2>
+  <div id="topClienti"></div>
+</div>
+
+<div class="row">
+  <div class="card"><h2>📅 Prenotazioni correnti</h2><div id="prenCorrenti"></div></div>
+  <div class="card"><h2>🔮 Prenotazioni prossime</h2><div id="prenProssime"></div></div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h2>📦 Prenotazioni passate</h2>
+  <div id="prenPassate"></div>
+</div>
+
+<div class="card" style="margin-bottom:24px">
+  <h2>📸 Media salvati</h2>
+  <div id="mediaList"></div>
+</div>
+
+<script>
+const KEY = """ + json.dumps(key) + """;
+let chTopic, chLingue;
+function vuoto(t){return '<div class="empty">'+t+'</div>'}
+function badgeC(c){return c==='whatsapp'?'<span class="badge b-wa">📱 WA</span>':'<span class="badge b-tg">💬 TG</span>'}
+function tabella(rows, cols){
+  if(!rows.length)return vuoto('Nessun dato.');
+  let h='<table><thead><tr>'+cols.map(c=>'<th>'+c.l+'</th>').join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{h+='<tr>'+cols.map(c=>'<td>'+(c.f?c.f(r):r[c.k]||'—')+'</td>').join('')+'</tr>'});
+  return h+'</tbody></table>';
+}
+async function caricaDati(){
+  document.getElementById('aggiornata').textContent='Caricamento...';
+  try{
+    const r=await fetch('/dashboard/api/data?key='+encodeURIComponent(KEY));
+    if(!r.ok){document.getElementById('aggiornata').textContent='Errore '+r.status;return}
+    const d=await r.json();
+    document.getElementById('aggiornata').textContent='Aggiornata: '+d.generato_il;
+    // KPI
+    document.getElementById('kpis').innerHTML=[
+      ['Totale messaggi','totale_lifetime'],
+      ['Messaggi oggi','totale_oggi'],
+      ['Clienti totali','totale_clienti'],
+      ['Ospiti attivi (7gg)','ospiti_attivi']
+    ].map(([l,k])=>'<div class="kpi"><div class="num">'+(d.kpi[k]||0)+'</div><div class="lbl">'+l+'</div></div>').join('');
+    // Grafici
+    if(chTopic)chTopic.destroy();
+    chTopic=new Chart(document.getElementById('grafTopic'),{type:'bar',data:{labels:Object.keys(d.argomenti),datasets:[{label:'Messaggi',data:Object.values(d.argomenti),backgroundColor:'#0066cc'}]},options:{plugins:{legend:{display:false}},responsive:true}});
+    if(chLingue)chLingue.destroy();
+    chLingue=new Chart(document.getElementById('grafLingue'),{type:'doughnut',data:{labels:Object.keys(d.lingue),datasets:[{data:Object.values(d.lingue),backgroundColor:['#0066cc','#22c55e','#f59e0b','#ef4444','#a855f7']}]},options:{responsive:true}});
+    // Conversazioni
+    document.getElementById('conversazioni').innerHTML=tabella(d.conversazioni_attive,[
+      {l:'Canale',f:r=>badgeC(r.canale)},
+      {l:'Nome',k:'nome'},
+      {l:'Msg',k:'msg_in_storia'},
+      {l:'Ultimo',k:'ultimo_msg'},
+      {l:'Storia',f:r=>'<a href="/dashboard/conversation/'+encodeURIComponent(r.chat_id)+'?key='+encodeURIComponent(KEY)+'" target="_blank">Vedi →</a>'}
+    ]);
+    // Top clienti
+    document.getElementById('topClienti').innerHTML=tabella(d.top_clienti,[
+      {l:'#',f:(r,i)=>r._i||''},
+      {l:'Canale',f:r=>badgeC(r.canale)},
+      {l:'Nome',f:r=>r.nome+(r.username?' <span style="color:#888">@'+r.username+'</span>':'')},
+      {l:'Msg totali',k:'totale_msg'},
+      {l:'Topic top',k:'topic_top'},
+      {l:'Lingua',k:'lingua'},
+      {l:'Primo',f:r=>(r.primo_msg||'').substring(0,10)},
+      {l:'Ultimo',f:r=>(r.ultimo_msg||'').substring(0,16).replace('T',' ')}
+    ].map((c,i)=>i===0?{l:'#',f:(r)=>d.top_clienti.indexOf(r)+1}:c));
+    // Prenotazioni
+    const colsPren=[
+      {l:'Nome',k:'nome'},{l:'Check-in',k:'checkin'},{l:'Check-out',k:'checkout'},{l:'Lingua',k:'lingua'}
+    ];
+    document.getElementById('prenCorrenti').innerHTML=tabella(d.prenotazioni_correnti,colsPren);
+    document.getElementById('prenProssime').innerHTML=tabella(d.prenotazioni_prossime,colsPren);
+    document.getElementById('prenPassate').innerHTML=tabella(d.prenotazioni_passate,colsPren);
+    // Media
+    document.getElementById('mediaList').innerHTML=tabella(d.media,[
+      {l:'#',k:'n'},
+      {l:'Tipo',f:r=>r.tipo==='video'?'🎬 Video':'📸 Foto'},
+      {l:'Keywords',k:'keywords'},
+      {l:'Caption',k:'caption'}
+    ]);
+  }catch(e){document.getElementById('aggiornata').textContent='Errore: '+e.message}
+}
+caricaDati();
+setInterval(caricaDati,60000);
+</script>
+</body>
+</html>"""
+    return Response(html, mimetype="text/html")
+
+
 @app.route("/privacy")
 def privacy_policy():
     html = """<!DOCTYPE html>
