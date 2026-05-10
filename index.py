@@ -1094,6 +1094,104 @@ def traduci_keywords(keywords_it):
     except Exception:
         return keywords_it  # fallback: usa solo le originali
 
+def trascrivi_audio_groq(audio_data, mime_hint="audio/ogg"):
+    """Trascrive audio binario via Groq Whisper. Restituisce testo trascritto o None."""
+    if not GROQ_KEY:
+        return None
+    if not audio_data:
+        return None
+    try:
+        # Determina estensione/filename in base al mime
+        if "ogg" in mime_hint or "opus" in mime_hint:
+            filename, mime = "audio.ogg", "audio/ogg"
+        elif "mp3" in mime_hint or "mpeg" in mime_hint:
+            filename, mime = "audio.mp3", "audio/mpeg"
+        elif "m4a" in mime_hint or "mp4" in mime_hint or "aac" in mime_hint:
+            filename, mime = "audio.m4a", "audio/m4a"
+        elif "wav" in mime_hint:
+            filename, mime = "audio.wav", "audio/wav"
+        elif "webm" in mime_hint:
+            filename, mime = "audio.webm", "audio/webm"
+        else:
+            filename, mime = "audio.ogg", "audio/ogg"
+        # Multipart upload a Groq Whisper
+        boundary = "----WhisperBoundary" + str(int(datetime.now().timestamp()))
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="model"\r\n\r\n'
+            f"whisper-large-v3-turbo\r\n"
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="response_format"\r\n\r\n'
+            f"json\r\n"
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n"
+        ).encode("utf-8") + audio_data + f"\r\n--{boundary}--\r\n".encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            data=body,
+            headers={
+                "Authorization": f"Bearer {GROQ_KEY}",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "User-Agent": "appartamento-bot"
+            }
+        )
+        r = urllib.request.urlopen(req, timeout=25)
+        result = json.loads(r.read())
+        return (result.get("text") or "").strip() or None
+    except Exception as e:
+        try:
+            log_errore("trascrivi_audio", e)
+        except Exception:
+            pass
+        return None
+
+
+def scarica_telegram_voice(file_id):
+    """Scarica un voice/audio da Telegram come bytes. Ritorna (data, mime) o (None, None)."""
+    try:
+        r = telegram("getFile", {"file_id": file_id})
+        file_path = r.get("result", {}).get("file_path")
+        if not file_path:
+            return None, None
+        url = f"https://api.telegram.org/file/bot{TOKEN}/{file_path}"
+        data = urllib.request.urlopen(url, timeout=15).read()
+        # Telegram voice notes sono OGG Opus
+        ext = file_path.lower().rsplit(".", 1)[-1] if "." in file_path else "ogg"
+        mime = {"ogg":"audio/ogg","oga":"audio/ogg","mp3":"audio/mpeg","m4a":"audio/m4a","wav":"audio/wav","webm":"audio/webm"}.get(ext, "audio/ogg")
+        return data, mime
+    except Exception as e:
+        try:
+            log_errore("scarica_tg_voice", e)
+        except Exception:
+            pass
+        return None, None
+
+
+def scarica_wa_media(media_id):
+    """Scarica un media da WhatsApp Cloud API come bytes. Ritorna (data, mime) o (None, None)."""
+    try:
+        # 1. Ottieni URL del media
+        url = f"https://graph.facebook.com/v22.0/{media_id}"
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {WA_TOKEN}"})
+        r = urllib.request.urlopen(req, timeout=10)
+        info = json.loads(r.read())
+        media_url = info.get("url")
+        mime = info.get("mime_type", "audio/ogg")
+        if not media_url:
+            return None, None
+        # 2. Scarica binario
+        req2 = urllib.request.Request(media_url, headers={"Authorization": f"Bearer {WA_TOKEN}"})
+        data = urllib.request.urlopen(req2, timeout=20).read()
+        return data, mime
+    except Exception as e:
+        try:
+            log_errore("scarica_wa_media", e)
+        except Exception:
+            pass
+        return None, None
+
+
 def _chiama_groq(model, messages, timeout):
     url = "https://api.groq.com/openai/v1/chat/completions"
     payload = {"model": model, "messages": messages}
@@ -1402,6 +1500,23 @@ def webhook():
 
         if not chat_id:
             return "ok"
+
+        # ── Audio/voice in arrivo → trascrivi e tratta come testo ──
+        voice_obj = message.get("voice") or message.get("audio")
+        if voice_obj and not testo:
+            file_id_audio = voice_obj.get("file_id")
+            mime_hint = voice_obj.get("mime_type", "audio/ogg")
+            if file_id_audio:
+                # Feedback istantaneo all'utente
+                if not is_owner:
+                    invia_messaggio(chat_id, "🎙️ Sto ascoltando il messaggio vocale...")
+                audio_data, mime = scarica_telegram_voice(file_id_audio)
+                trascritto = trascrivi_audio_groq(audio_data, mime or mime_hint) if audio_data else None
+                if trascritto:
+                    testo = trascritto  # tratta come testo normale
+                else:
+                    invia_messaggio(chat_id, "Mi dispiace, non sono riuscito a capire l'audio 🙏 Puoi scrivermi a testo?")
+                    return "ok"
 
         # ── Proprietario invia foto/video → avvia flusso guidato ──
         if is_owner and not testo:
@@ -2866,21 +2981,35 @@ def whatsapp_webhook():
             return "ok"
 
         msg = messages[0]
-
-        # Gestisci solo messaggi di testo
-        if msg.get("type") != "text":
-            wa_from = msg["from"]
-            contacts = value.get("contacts", [])
-            nome = contacts[0]["profile"]["name"] if contacts else "Ospite"
-            wa_invia(wa_from, "Ciao! 😊 Al momento riesco a rispondere solo ai messaggi di testo. Scrivi pure la tua domanda!")
-            return "ok"
-
+        msg_type = msg.get("type")
         wa_from = msg["from"]   # es. "393202599675" (senza +)
-        testo   = msg["text"]["body"]
-
-        # Nome del contatto
         contacts = value.get("contacts", [])
-        nome     = contacts[0]["profile"]["name"] if contacts else "Ospite"
+        nome = contacts[0]["profile"]["name"] if contacts else "Ospite"
+
+        # Audio/voice in arrivo → trascrivi e tratta come testo
+        if msg_type == "audio":
+            audio_obj = msg.get("audio", {})
+            media_id = audio_obj.get("id")
+            mime_hint = audio_obj.get("mime_type", "audio/ogg")
+            if media_id:
+                # Feedback all'ospite (in italiano: il bot rileva la lingua dopo dalla trascrizione)
+                wa_invia(wa_from, "🎙️ Sto ascoltando il messaggio vocale...")
+                audio_data, mime = scarica_wa_media(media_id)
+                trascritto = trascrivi_audio_groq(audio_data, mime or mime_hint) if audio_data else None
+                if trascritto:
+                    testo = trascritto
+                else:
+                    wa_invia(wa_from, "Mi dispiace, non sono riuscito a capire l'audio 🙏 Puoi scrivermi a testo?")
+                    return "ok"
+            else:
+                wa_invia(wa_from, "Mi dispiace, non sono riuscito a ricevere l'audio 🙏")
+                return "ok"
+        elif msg_type != "text":
+            # Altri tipi (image, video, document, sticker, location...) non gestiti per ora
+            wa_invia(wa_from, "Ciao! 😊 Al momento gestisco solo testo e messaggi vocali. Scrivi o registra pure la tua domanda!")
+            return "ok"
+        else:
+            testo = msg["text"]["body"]
 
         # Chiave sessione WhatsApp separata da Telegram
         wa_session_id = f"wa_{wa_from}"
