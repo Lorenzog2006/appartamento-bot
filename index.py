@@ -1968,6 +1968,15 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .list-row .R .num{font-size:16px;font-weight:700}
 .list-row .R .lbl{font-size:10.5px;color:var(--txt-mute);margin-top:2px}
 .aggiornata{font-size:11px;color:var(--txt-mute);margin:8px 4px 0;text-align:center}
+.cli-row{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.04);border-radius:14px;padding:14px 12px;margin-bottom:8px;cursor:pointer;transition:background .15s ease}
+.cli-row:active{background:rgba(255,255,255,.08)}
+.cli-rank{flex-shrink:0;min-width:42px;text-align:center;color:#fff;font-weight:700;font-size:12px;padding:6px 8px;border-radius:10px}
+.cli-main{flex:1;min-width:0}
+.cli-name{font-size:14.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cli-period{font-size:12px;color:var(--txt-mute);margin-top:3px}
+.cli-count{flex-shrink:0;text-align:right;min-width:48px}
+.cli-num{font-size:22px;font-weight:800;color:#fff;line-height:1}
+.cli-lbl{font-size:10.5px;color:var(--txt-mute);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
 </style>
 </head>
 <body>
@@ -2054,27 +2063,37 @@ function colorByRank(rank,total){
   return 'red';
 }
 
+function fmtGiorno(s){
+  if(!s)return '?';
+  const d=new Date(s);
+  if(isNaN(d.getTime()))return s.substring(0,10);
+  return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit'});
+}
+
 function renderClienti(){
   const g=document.getElementById('clientiGrid');
   const lst=DATI.top_clienti||[];
   if(!lst.length){g.innerHTML='<div class="empty">Nessun cliente registrato.<br><br>Apparirà qui appena ricevi il primo messaggio.</div>';return}
+  // Cambio layout: lista invece di grid
+  g.style.gridTemplateColumns='1fr';
   g.innerHTML=lst.map((c,i)=>{
     const rank=i+1;
     const color=colorByActivity(c.ultimo_msg);
-    const username=c.username?' @'+c.username:'';
-    return `<div class="card ${color}" onclick='apriCliente(${JSON.stringify(c)})'>
-      <div class="top">
-        <div class="ttl">${escapeHtml((c.nome||'?').slice(0,20))}</div>
-        <div class="rank"># ${rank}°</div>
+    const ic=c.canale==='whatsapp'?'📱':'💬';
+    const dal=fmtGiorno(c.primo_msg);
+    const al=fmtGiorno(c.ultimo_msg);
+    const stesso=dal===al;
+    const periodo=stesso?dal:`${dal} → ${al}`;
+    const badgeCol={red:'#7a1818',yellow:'#a07208',green:'#16704a'}[color];
+    return `<div class="cli-row" onclick='apriCliente(${JSON.stringify(c)})'>
+      <div class="cli-rank" style="background:${badgeCol}">#${rank}</div>
+      <div class="cli-main">
+        <div class="cli-name">${ic} ${escapeHtml(c.nome||'?')}${c.username?' <span style="opacity:.5">@'+escapeHtml(c.username)+'</span>':''}</div>
+        <div class="cli-period">📅 ${periodo}</div>
       </div>
-      <div>
-        <div class="big">${c.totale_msg||0}</div>
-        <div class="sub">messaggi</div>
-        <div class="lines">
-          <div><b>${badgeCanale(c.canale)}</b>${username?' · '+escapeHtml(username):''}</div>
-          <div><b>Topic:</b> ${escapeHtml(c.topic_top||'—')}</div>
-          <div><b>Ultimo:</b> ${fmtData(c.ultimo_msg)}</div>
-        </div>
+      <div class="cli-count">
+        <div class="cli-num">${c.totale_msg||0}</div>
+        <div class="cli-lbl">msg</div>
       </div>
     </div>`;
   }).join('');
