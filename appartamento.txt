@@ -246,6 +246,8 @@ Dove trovo la scopa: La trovi sul terrazzo uscendo sul lato destro
 Dove trovo la scopa: La trovi sul terrazzo uscendo sul lato destro
 # Aggiunto il 10/05/2026
 Dove trovo il contatore luce: Il contatore si trova all’ingresso nello sportello bianco sulla sinistra prima della camera da letto
+# Aggiunto il 10/05/2026
+Dove trovo il contatore luce: Il contatore si trova all’ingresso nello sportello bianco sulla sinistra prima della camera da letto
 
 [MEDIA]
 keybox, keybox, boite a cle, caja de llaves, schluesselkasten = photo:AgACAgIAAxkBAAIC02n1CRzqGtbDUMFiJRzJNgWch3TsAALNFmsb-gOpS0bdN-CXWrsgAQADAgADeQADOwQ | Qui dove si trova la keybox
