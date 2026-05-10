@@ -1392,6 +1392,74 @@ def health():
     return "Bot attivo! ✓"
 
 
+@app.route("/privacy")
+def privacy_policy():
+    html = """<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Bot Appartamento Juan les Pins</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #222; line-height: 1.6; }
+h1 { color: #0066cc; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+h2 { margin-top: 30px; color: #333; }
+.update { color: #666; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>Informativa sulla Privacy</h1>
+<p class="update">Ultimo aggiornamento: 9 maggio 2026</p>
+
+<h2>1. Titolare del trattamento</h2>
+<p>Lorenzo Guzzi, proprietario dell'appartamento in affitto a Juan les Pins (Antibes, Francia). Contatto: tramite Booking, Airbnb o WhatsApp al numero ufficiale dell'appartamento.</p>
+
+<h2>2. Cosa fa questo bot</h2>
+<p>Questo è un assistente virtuale automatico che risponde alle domande degli ospiti dell'appartamento (informazioni su check-in, parcheggio, WiFi, ecc.) tramite Telegram e WhatsApp.</p>
+
+<h2>3. Dati raccolti</h2>
+<ul>
+<li><strong>Identificativo della chat</strong> (numero di telefono WhatsApp o ID Telegram), per poter rispondere.</li>
+<li><strong>Nome pubblico del profilo</strong> (se disponibile), usato solo internamente per identificare l'ospite.</li>
+<li><strong>Contenuto dei messaggi</strong> scambiati con il bot, conservati per un massimo di 2 ore per mantenere il contesto della conversazione.</li>
+</ul>
+
+<h2>4. Come usiamo i dati</h2>
+<p>I dati sono usati esclusivamente per:</p>
+<ul>
+<li>rispondere automaticamente alle tue domande tramite intelligenza artificiale (Anthropic Claude / Groq);</li>
+<li>inoltrare le tue richieste al proprietario in caso il bot non sappia rispondere;</li>
+<li>generare risposte coerenti tenendo conto della conversazione recente.</li>
+</ul>
+
+<h2>5. Condivisione con terze parti</h2>
+<p>I messaggi vengono elaborati da:</p>
+<ul>
+<li><strong>Anthropic</strong> (Claude API) e <strong>Groq</strong> per generare le risposte AI;</li>
+<li><strong>Meta / WhatsApp</strong> (gestisce l'infrastruttura di messaggistica);</li>
+<li><strong>Telegram</strong> (gestisce l'infrastruttura del bot Telegram);</li>
+<li><strong>Vercel</strong> e <strong>GitHub</strong> per hosting e persistenza temporanea.</li>
+</ul>
+<p>Nessun dato viene venduto né usato per profilazione pubblicitaria.</p>
+
+<h2>6. Conservazione</h2>
+<p>Le conversazioni sono conservate per un massimo di 2 ore dopo l'ultimo messaggio, dopodiché vengono cancellate automaticamente. Le statistiche aggregate anonime (numero di domande per categoria) sono mantenute a scopo di miglioramento del servizio.</p>
+
+<h2>7. I tuoi diritti (GDPR)</h2>
+<p>Hai diritto di accesso, rettifica e cancellazione dei tuoi dati. Per esercitarli, contatta direttamente Lorenzo tramite la piattaforma di prenotazione.</p>
+
+<h2>8. Sicurezza</h2>
+<p>I dati sono trasmessi tramite HTTPS/TLS. Non vengono mai richieste credenziali di pagamento o dati sensibili: il bot risponde solo a domande sull'appartamento.</p>
+
+<h2>9. Contatti</h2>
+<p>Per qualsiasi questione relativa al trattamento dei dati, contatta Lorenzo tramite la chat WhatsApp ufficiale dell'appartamento o tramite Booking/Airbnb.</p>
+
+</body>
+</html>"""
+    from flask import Response
+    return Response(html, mimetype="text/html")
+
+
 # ── WhatsApp: invia messaggio ─────────────────────────────────────────────────
 def wa_invia(to, testo):
     """Invia un messaggio di testo via WhatsApp Cloud API."""
