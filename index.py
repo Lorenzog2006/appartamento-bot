@@ -44,6 +44,8 @@ _attesa_date = {}
 _attesa_correzione_owner = {}
 # Flusso guidato upload media: OWNER_ID → {file_id, tipo, step, keywords}
 _upload_media = {}
+# Flusso guidato creazione prenotazione manuale: OWNER_ID → {step, nome, checkin, checkout, lingua}
+_attesa_prenotazione = {}
 
 def _carica_conversazioni_da_github():
     """Carica conversazioni da GitHub. Best-effort, mai bloccante."""
@@ -1841,6 +1843,26 @@ def webhook():
             elif cb_data == "DEL_MEDIA_CANCEL":
                 modifica_messaggio(cb_chat_id, cb_msg_id, "✅ Annullato. Nessun media è stato cancellato.")
 
+            # ── Prenotazione: scelta lingua ──
+            elif cb_data.startswith("PREN_LANG:"):
+                lingua_scelta = cb_data.split(":", 1)[1]
+                if str(cb_chat_id) in _attesa_prenotazione:
+                    stato = _attesa_prenotazione[str(cb_chat_id)]
+                    stato["lingua"] = lingua_scelta
+                    stato["step"] = "contatto"
+                    modifica_messaggio(cb_chat_id, cb_msg_id,
+                        cb_testo + f"\n\n✅ Lingua: *{lingua_scelta}*", parse_mode="Markdown", bottoni=[])
+                    invia_messaggio(cb_chat_id,
+                        "📅 *Passo 4/4* — Come contatti il cliente?\n\n"
+                        "Scrivi una di queste opzioni:\n"
+                        "• `wa 393201234567` (numero WhatsApp con prefisso paese, senza +)\n"
+                        "• `tg 8668813727` (chat ID Telegram dell'ospite)\n"
+                        "• `no` (salta — niente promemoria automatici)",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    modifica_messaggio(cb_chat_id, cb_msg_id, "⚠️ Sessione prenotazione scaduta. Usa /prenotazione per ricominciare.")
+
             # ── Pausa AI da bottone notifica ──
             elif cb_data.startswith("PAUSA:"):
                 target = cb_data.split(":", 1)[1]
@@ -2149,6 +2171,160 @@ def webhook():
                 invia_messaggio(chat_id, f"▶️ AI riattivata per `{target}`", parse_mode="Markdown")
             else:
                 invia_messaggio(chat_id, f"❌ Errore")
+            return "ok"
+
+        # ── /prenotazione ── wizard per aggiungere prenotazione manualmente ──
+        if testo == "/prenotazione" and is_owner:
+            _attesa_prenotazione[str(chat_id)] = {"step": "nome"}
+            invia_messaggio(chat_id,
+                "📅 *Nuova prenotazione* — passo 1/4\n\n"
+                "Come si chiama l'ospite?\n\n"
+                "_(scrivi /annulla per annullare in qualsiasi momento)_",
+                parse_mode="Markdown"
+            )
+            return "ok"
+
+        if testo == "/annulla" and is_owner and str(chat_id) in _attesa_prenotazione:
+            _attesa_prenotazione.pop(str(chat_id), None)
+            invia_messaggio(chat_id, "❌ Prenotazione annullata.")
+            return "ok"
+
+        # ── Flusso prenotazione manuale ──
+        if is_owner and str(chat_id) in _attesa_prenotazione and not testo.startswith("/"):
+            stato = _attesa_prenotazione[str(chat_id)]
+            if stato["step"] == "nome":
+                stato["nome"] = testo.strip()
+                stato["step"] = "date"
+                invia_messaggio(chat_id,
+                    f"✅ Ospite: *{stato['nome']}*\n\n"
+                    f"📅 *Passo 2/4* — Date di check-in e check-out\n\n"
+                    f"Scrivi in uno di questi formati:\n"
+                    f"• `15/06/2026 - 22/06/2026`\n"
+                    f"• `15 giugno - 22 giugno`\n"
+                    f"• `dal 15/06 al 22/06`",
+                    parse_mode="Markdown"
+                )
+                return "ok"
+            elif stato["step"] == "date":
+                ci, co = estrai_date(testo)
+                if not ci or not co:
+                    invia_messaggio(chat_id,
+                        "❌ Non ho capito le date. Riprova nel formato `15/06/2026 - 22/06/2026`",
+                        parse_mode="Markdown"
+                    )
+                    return "ok"
+                stato["checkin"] = ci
+                stato["checkout"] = co
+                stato["step"] = "lingua"
+                invia_bottoni(chat_id,
+                    f"✅ Check-in: {ci}\n✅ Check-out: {co}\n\n"
+                    f"📅 *Passo 3/4* — Lingua dell'ospite",
+                    [[
+                        {"text": "🇮🇹 Italiano", "callback_data": "PREN_LANG:italian"},
+                        {"text": "🇬🇧 English", "callback_data": "PREN_LANG:english"}
+                    ], [
+                        {"text": "🇫🇷 Français", "callback_data": "PREN_LANG:french"},
+                        {"text": "🇪🇸 Español", "callback_data": "PREN_LANG:spanish"}
+                    ], [
+                        {"text": "🇩🇪 Deutsch", "callback_data": "PREN_LANG:german"}
+                    ]],
+                    parse_mode="Markdown"
+                )
+                return "ok"
+            elif stato["step"] == "contatto":
+                # Step finale: ricevuto contatto
+                contatto = testo.strip().lower()
+                chat_id_finale = None
+                canale = None
+                if contatto in ("no", "skip", "salta"):
+                    # Salva senza canale → niente promemoria automatici
+                    chat_id_finale = f"manual_{int(datetime.now().timestamp())}"
+                elif contatto.startswith("wa "):
+                    numero = re.sub(r'\D', '', contatto[3:])  # solo cifre
+                    if len(numero) < 8:
+                        invia_messaggio(chat_id, "❌ Numero WhatsApp non valido. Riprova (es: `wa 393201234567`).", parse_mode="Markdown")
+                        return "ok"
+                    chat_id_finale = f"wa_{numero}"
+                    canale = "whatsapp"
+                elif contatto.startswith("tg "):
+                    cid_str = re.sub(r'\D', '', contatto[3:])
+                    if len(cid_str) < 4:
+                        invia_messaggio(chat_id, "❌ Chat ID Telegram non valido.", parse_mode="Markdown")
+                        return "ok"
+                    chat_id_finale = cid_str
+                    canale = "telegram"
+                else:
+                    invia_messaggio(chat_id,
+                        "❌ Formato non riconosciuto. Usa:\n• `wa 393201234567` per WhatsApp\n• `tg 12345678` per Telegram chat ID\n• `no` per saltare (niente promemoria automatici)",
+                        parse_mode="Markdown"
+                    )
+                    return "ok"
+                ok = salva_prenotazione(chat_id_finale, stato["nome"], stato["checkin"], stato["checkout"], stato["lingua"])
+                _attesa_prenotazione.pop(str(chat_id), None)
+                if ok:
+                    if canale:
+                        riga_canale = f"📱 *{canale.title()}*: `{chat_id_finale}`\n\n✅ Da domani il bot manderà automaticamente i promemoria a questo ospite."
+                    else:
+                        riga_canale = "ℹ️ _Nessun canale impostato → niente promemoria automatici per questa prenotazione._"
+                    invia_messaggio(chat_id,
+                        f"✅ *Prenotazione salvata!*\n\n"
+                        f"👤 {stato['nome']}\n"
+                        f"📅 Check-in: {stato['checkin']}\n"
+                        f"🏁 Check-out: {stato['checkout']}\n"
+                        f"🌍 Lingua: {stato['lingua']}\n\n"
+                        f"{riga_canale}",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    invia_messaggio(chat_id, "❌ Errore nel salvataggio. Riprova.")
+                return "ok"
+
+        # ── /prenotazioni ── lista prenotazioni esistenti ──
+        if testo == "/prenotazioni" and is_owner:
+            try:
+                prenotazioni, _ = carica_prenotazioni()
+                if not prenotazioni:
+                    invia_messaggio(chat_id, "📭 Nessuna prenotazione registrata.\n\nUsa /prenotazione per aggiungerne una.")
+                    return "ok"
+                from datetime import timedelta as _td
+                oggi = datetime.now().date()
+                correnti, prossime, passate = [], [], []
+                for cid, p in prenotazioni.items():
+                    try:
+                        ci = datetime.strptime(p["checkin"], "%d/%m/%Y").date()
+                        co = datetime.strptime(p["checkout"], "%d/%m/%Y").date()
+                        row = (cid, p, ci, co)
+                        if co < oggi:
+                            passate.append(row)
+                        elif ci <= oggi <= co:
+                            correnti.append(row)
+                        else:
+                            prossime.append(row)
+                    except Exception:
+                        pass
+                prossime.sort(key=lambda r: r[2])
+                passate.sort(key=lambda r: r[3], reverse=True)
+                lines = ["📅 *PRENOTAZIONI*\n"]
+                if correnti:
+                    lines.append("🟢 *In corso:*")
+                    for cid, p, ci, co in correnti:
+                        canale = "📱" if str(cid).startswith("wa_") else ("💬" if str(cid).isdigit() else "📝")
+                        lines.append(f"• {canale} {p.get('nome','?')} ({p.get('lingua','?')}) — {p['checkin']} → {p['checkout']}")
+                    lines.append("")
+                if prossime:
+                    lines.append("🔵 *Prossime:*")
+                    for cid, p, ci, co in prossime[:10]:
+                        canale = "📱" if str(cid).startswith("wa_") else ("💬" if str(cid).isdigit() else "📝")
+                        lines.append(f"• {canale} {p.get('nome','?')} ({p.get('lingua','?')}) — {p['checkin']} → {p['checkout']}")
+                    lines.append("")
+                if passate:
+                    lines.append(f"⚪ *Passate* (ultime 5 su {len(passate)}):")
+                    for cid, p, ci, co in passate[:5]:
+                        lines.append(f"• {p.get('nome','?')} — {p['checkin']} → {p['checkout']}")
+                lines.append("\n_Aggiungi: /prenotazione_")
+                invia_messaggio(chat_id, "\n".join(lines), parse_mode="Markdown")
+            except Exception as e:
+                invia_messaggio(chat_id, f"❌ Errore: {e}")
             return "ok"
 
         # ── /dashboard ── manda link sicuro alla dashboard web ──
