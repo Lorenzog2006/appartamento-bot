@@ -303,6 +303,39 @@ def rileva_sentiment_negativo(testo):
         return True
     return False
 
+def is_in_takeover(chat_id):
+    """True se la conversazione è in 'takeover' (Lorenzo l'ha presa in carico esplicitamente)."""
+    try:
+        _carica_users_da_github()
+        u = _users.get(str(chat_id), {})
+        return bool(u.get("in_takeover"))
+    except Exception:
+        return False
+
+def set_takeover(chat_id, attivo):
+    """Attiva/disattiva il takeover per un cliente."""
+    try:
+        _carica_users_da_github()
+        cid = str(chat_id)
+        if cid not in _users:
+            _users[cid] = {"canale": "telegram" if not cid.startswith("wa_") else "whatsapp"}
+        _users[cid]["in_takeover"] = bool(attivo)
+        _users[cid]["pausa_ai"] = bool(attivo)  # takeover implica anche pausa AI
+        _salva_users_su_github()
+        return True
+    except Exception:
+        return False
+
+# Messaggi takeover per lingua (mandati all'ospite quando Lorenzo prende la chat)
+TAKEOVER_MSG = {
+    "italian":  "Un attimo, ti rispondo io personalmente! 👋",
+    "english":  "One moment, I'm taking over to reply personally! 👋",
+    "french":   "Un instant, je te réponds personnellement! 👋",
+    "spanish":  "¡Un momento, te respondo personalmente! 👋",
+    "german":   "Einen Moment, ich antworte dir persönlich! 👋",
+    "portuguese": "Um momento, vou responder pessoalmente! 👋",
+}
+
 def is_paused(chat_id):
     """True se la AI e' in pausa per questo cliente."""
     try:
@@ -1001,6 +1034,104 @@ def rileva_lingua(testo):
     migliore = max(punteggi, key=punteggi.get)
     return migliore if punteggi[migliore] > 0 else "italian"
 
+# ── Meteo (OpenMeteo, gratis senza API key) ────────────────────────────────────
+# Coordinate Juan-les-Pins (per multi-tenant in futuro: ogni tenant ha le sue)
+METEO_LAT = 43.5640
+METEO_LON = 7.1241
+_meteo_cache = {"data": None, "ts": 0}
+METEO_CACHE_TTL = 1800  # 30 minuti
+
+WEATHER_CODES = {
+    0: ("☀️", "Sereno"),
+    1: ("🌤️", "Prevalentemente sereno"),
+    2: ("⛅", "Parzialmente nuvoloso"),
+    3: ("☁️", "Nuvoloso"),
+    45: ("🌫️", "Nebbia"),
+    48: ("🌫️", "Nebbia gelata"),
+    51: ("🌦️", "Pioggerella leggera"),
+    53: ("🌦️", "Pioggerella moderata"),
+    55: ("🌧️", "Pioggerella intensa"),
+    61: ("🌧️", "Pioggia leggera"),
+    63: ("🌧️", "Pioggia moderata"),
+    65: ("🌧️", "Pioggia intensa"),
+    71: ("🌨️", "Neve leggera"),
+    73: ("🌨️", "Neve moderata"),
+    75: ("❄️", "Neve intensa"),
+    80: ("🌧️", "Rovesci leggeri"),
+    81: ("🌧️", "Rovesci moderati"),
+    82: ("⛈️", "Rovesci violenti"),
+    95: ("⛈️", "Temporale"),
+    96: ("⛈️", "Temporale con grandine leggera"),
+    99: ("⛈️", "Temporale con grandine forte"),
+}
+
+KEYWORDS_METEO = {
+    "italian":  ["meteo", "tempo che fa", "che tempo", "pioggia", "piove", "sole", "soleggiato", "nuvoloso", "temperatura", "fa caldo", "fa freddo", "previsioni"],
+    "english":  ["weather", "rain", "raining", "sunny", "cloudy", "temperature", "hot", "cold", "forecast", "will it rain"],
+    "french":   ["météo", "temps", "pluie", "pleut", "soleil", "ensoleillé", "nuageux", "température", "prévisions"],
+    "spanish":  ["tiempo", "lluvia", "llueve", "sol", "soleado", "nublado", "temperatura", "calor", "frío", "pronóstico"],
+    "german":   ["wetter", "regen", "regnet", "sonne", "sonnig", "bewölkt", "temperatur", "heiß", "kalt", "vorhersage"],
+}
+
+def e_domanda_meteo(testo):
+    """True se la domanda riguarda il meteo (qualunque lingua)."""
+    if not testo:
+        return False
+    t = " " + testo.lower() + " "
+    for parole in KEYWORDS_METEO.values():
+        for p in parole:
+            if p in t:
+                return True
+    return False
+
+def recupera_meteo():
+    """Scarica previsioni 3 giorni da OpenMeteo. Cache 30 min in-memory."""
+    ora = datetime.now().timestamp()
+    if _meteo_cache["data"] and (ora - _meteo_cache["ts"]) < METEO_CACHE_TTL:
+        return _meteo_cache["data"]
+    try:
+        url = (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={METEO_LAT}&longitude={METEO_LON}"
+            f"&current_weather=true"
+            f"&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum,precipitation_probability_max"
+            f"&timezone=Europe%2FParis&forecast_days=3"
+        )
+        r = urllib.request.urlopen(url, timeout=6)
+        data = json.loads(r.read())
+        daily = data.get("daily", {})
+        current = data.get("current_weather", {})
+        giorni_label = ["Oggi", "Domani", "Dopodomani"]
+        righe = []
+        # Attuale
+        if current:
+            code = current.get("weathercode", 0)
+            emoji, _ = WEATHER_CODES.get(code, ("🌡️", "?"))
+            t = current.get("temperature")
+            righe.append(f"• Ora: {emoji} {t}°C")
+        # Prossimi 3 giorni
+        codes = daily.get("weathercode", [])
+        max_t = daily.get("temperature_2m_max", [])
+        min_t = daily.get("temperature_2m_min", [])
+        prob = daily.get("precipitation_probability_max", [])
+        for i, code in enumerate(codes[:3]):
+            emoji, descr = WEATHER_CODES.get(code, ("🌡️", "?"))
+            mx = max_t[i] if i < len(max_t) else "?"
+            mn = min_t[i] if i < len(min_t) else "?"
+            pr = prob[i] if i < len(prob) else 0
+            righe.append(f"• {giorni_label[i]}: {emoji} {descr}, min {mn}°C / max {mx}°C, pioggia {pr}%")
+        testo = "Meteo Juan-les-Pins (fonte: Open-Meteo, ufficiale):\n" + "\n".join(righe)
+        _meteo_cache["data"] = testo
+        _meteo_cache["ts"] = ora
+        return testo
+    except Exception as e:
+        try:
+            log_errore("meteo", e)
+        except Exception:
+            pass
+        return None
+
+
 SYSTEM_PROMPT = {
     "italian": (
         "Sei un assistente virtuale per un appartamento in affitto su Booking e Airbnb. "
@@ -1011,7 +1142,8 @@ SYSTEM_PROMPT = {
         "NUMERO DI TELEFONO: il numero di Lorenzo è disponibile nelle informazioni qui sotto. Forniscilo SOLO E SOLTANTO se l'ospite lo richiede esplicitamente con frasi come 'voglio chiamare', 'qual è il numero', 'puoi darmi il telefono', 'come ti chiamo', 'vorrei parlare al telefono'. Per qualsiasi altro tipo di domanda NON menzionarlo mai. Quando lo dai, presentalo chiaramente: '📞 Puoi chiamare Lorenzo al [numero]'. "
         "Riferisciti sempre al proprietario come 'Lorenzo'. "
         "Sii cordiale e conciso. "
-        "Aggiungi 1-2 emoji coerenti con l'argomento (es. 🚗 parcheggio, 🏖️ spiaggia, 🚆 treno, 📶 wifi, 🔑 check-in, 🛒 supermercato, 🍽️ ristorante).\n\nINFORMAZIONI APPARTAMENTO:\n{info}"
+        "Aggiungi 1-2 emoji coerenti con l'argomento (es. 🚗 parcheggio, 🏖️ spiaggia, 🚆 treno, 📶 wifi, 🔑 check-in, 🛒 supermercato, 🍽️ ristorante). "
+        "INDIRIZZI E MAPS: ogni volta che citi un indirizzo specifico (appartamento, ristorante, supermercato, spiaggia, ecc.), aggiungi sempre subito dopo un link Google Maps cliccabile in questo formato esatto: 📍 https://maps.google.com/?q=INDIRIZZO+COMPLETO+URL+ENCODED (spazi sostituiti con +, virgole rimosse). Esempio: per '93 Bd Raymond Poincaré, 06160 Antibes' scrivi 📍 https://maps.google.com/?q=93+Bd+Raymond+Poincare+06160+Antibes\n\nINFORMAZIONI APPARTAMENTO:\n{info}"
     ),
     "french": (
         "Tu es un assistant virtuel pour un appartement de location sur Booking et Airbnb. "
@@ -1022,7 +1154,8 @@ SYSTEM_PROMPT = {
         "NUMÉRO DE TÉLÉPHONE: le numéro de Lorenzo se trouve dans les informations ci-dessous. Donne-le UNIQUEMENT si le client le demande explicitement avec des phrases comme 'je veux appeler', 'quel est le numéro', 'peux-tu me donner le téléphone', 'comment je peux t'appeler'. Sinon, ne le mentionne JAMAIS. Quand tu le donnes, présente-le clairement: '📞 Tu peux appeler Lorenzo au [numéro]'. "
         "Réfère-toi toujours au propriétaire comme 'Lorenzo'. "
         "Sois cordial et concis. "
-        "Ajoute 1-2 emojis cohérents avec le sujet (ex. 🚗 parking, 🏖️ plage, 🚆 train, 📶 wifi, 🔑 check-in).\n\nINFORMATIONS APPARTEMENT:\n{info}"
+        "Ajoute 1-2 emojis cohérents avec le sujet (ex. 🚗 parking, 🏖️ plage, 🚆 train, 📶 wifi, 🔑 check-in). "
+        "ADRESSES ET MAPS: chaque fois que tu cites une adresse spécifique (appartement, restaurant, supermarché, plage, etc.), ajoute toujours juste après un lien Google Maps cliquable dans ce format exact: 📍 https://maps.google.com/?q=ADRESSE+COMPLETE+URL+ENCODE (espaces remplacés par +, virgules supprimées).\n\nINFORMATIONS APPARTEMENT:\n{info}"
     ),
     "english": (
         "You are a virtual assistant for a vacation rental apartment on Booking and Airbnb. "
@@ -1033,7 +1166,8 @@ SYSTEM_PROMPT = {
         "PHONE NUMBER: Lorenzo's phone number is available in the information below. Share it ONLY if the guest explicitly asks with phrases like 'I want to call', 'what's the phone number', 'can you give me the phone', 'how can I reach you'. Otherwise NEVER mention it. When you give it, present it clearly: '📞 You can call Lorenzo at [number]'. "
         "Always refer to the owner as 'Lorenzo'. "
         "Be friendly and concise. "
-        "Add 1-2 relevant emojis (e.g. 🚗 parking, 🏖️ beach, 🚆 train, 📶 wifi, 🔑 check-in, 🛒 supermarket, 🍽️ restaurant).\n\nAPARTMENT INFORMATION:\n{info}"
+        "Add 1-2 relevant emojis (e.g. 🚗 parking, 🏖️ beach, 🚆 train, 📶 wifi, 🔑 check-in, 🛒 supermarket, 🍽️ restaurant). "
+        "ADDRESSES AND MAPS: whenever you mention a specific address (apartment, restaurant, supermarket, beach, etc.), always add right after a clickable Google Maps link in this exact format: 📍 https://maps.google.com/?q=FULL+ADDRESS+URL+ENCODED (spaces replaced by +, commas removed).\n\nAPARTMENT INFORMATION:\n{info}"
     ),
     "spanish": (
         "Eres un asistente virtual para un apartamento de alquiler en Booking y Airbnb. "
@@ -1044,7 +1178,8 @@ SYSTEM_PROMPT = {
         "TELÉFONO: el número de Lorenzo está en las informaciones de abajo. Compártelo SOLO si el huésped lo pide explícitamente con frases como 'quiero llamar', 'cuál es el número', 'puedes darme el teléfono', 'cómo te llamo'. En cualquier otro caso NUNCA lo menciones. Cuando lo des, preséntalo claramente: '📞 Puedes llamar a Lorenzo al [número]'. "
         "Llama siempre al propietario 'Lorenzo'. "
         "Sé cordial y conciso. "
-        "Añade 1-2 emojis coherentes con el tema (ej. 🚗 aparcamiento, 🏖️ playa, 🚆 tren, 📶 wifi, 🔑 check-in).\n\nINFORMACIÓN DEL APARTAMENTO:\n{info}"
+        "Añade 1-2 emojis coherentes con el tema (ej. 🚗 aparcamiento, 🏖️ playa, 🚆 tren, 📶 wifi, 🔑 check-in). "
+        "DIRECCIONES Y MAPS: cada vez que cites una dirección específica (apartamento, restaurante, supermercado, playa, etc.), añade siempre justo después un enlace Google Maps clicable en este formato exacto: 📍 https://maps.google.com/?q=DIRECCION+COMPLETA+URL+ENCODED (espacios reemplazados por +, comas eliminadas).\n\nINFORMACIÓN DEL APARTAMENTO:\n{info}"
     ),
     "german": (
         "Du bist ein virtueller Assistent für eine Ferienwohnung auf Booking und Airbnb. "
@@ -1055,7 +1190,8 @@ SYSTEM_PROMPT = {
         "TELEFONNUMMER: Lorenzos Nummer steht in den Informationen unten. Gib sie NUR weiter, wenn der Gast sie ausdrücklich verlangt mit Sätzen wie 'ich möchte anrufen', 'wie ist die Nummer', 'kannst du mir das Telefon geben', 'wie erreiche ich dich'. Sonst erwähne sie NIEMALS. Wenn du sie gibst, präsentiere sie klar: '📞 Du kannst Lorenzo unter [Nummer] anrufen'. "
         "Nenne den Eigentümer immer 'Lorenzo'. "
         "Sei freundlich und prägnant. "
-        "Füge 1-2 passende Emojis hinzu (z.B. 🚗 Parkplatz, 🏖️ Strand, 🚆 Zug, 📶 WLAN, 🔑 Check-in).\n\nWOHNUNGSINFORMATIONEN:\n{info}"
+        "Füge 1-2 passende Emojis hinzu (z.B. 🚗 Parkplatz, 🏖️ Strand, 🚆 Zug, 📶 WLAN, 🔑 Check-in). "
+        "ADRESSEN UND MAPS: jedes Mal wenn du eine konkrete Adresse erwähnst (Wohnung, Restaurant, Supermarkt, Strand usw.), füge immer direkt danach einen klickbaren Google Maps Link in genau diesem Format hinzu: 📍 https://maps.google.com/?q=VOLLSTAENDIGE+ADRESSE+URL+ENCODED (Leerzeichen durch + ersetzt, Kommas entfernt).\n\nWOHNUNGSINFORMATIONEN:\n{info}"
     ),
 }
 
@@ -1230,6 +1366,11 @@ def _chiama_claude(system_text, messages_claude, timeout=35):
 
 def chiedi_ai(domanda, info, chat_id=None):
     lingua = rileva_lingua(domanda)
+    # Se domanda meteo, inietta info meteo aggiornate dal servizio OpenMeteo
+    if e_domanda_meteo(domanda):
+        meteo_str = recupera_meteo()
+        if meteo_str:
+            info = f"{info}\n\n[INFORMAZIONI METEO AGGIORNATE — usa questi dati per rispondere a domande sul tempo]\n{meteo_str}"
     system_text = SYSTEM_PROMPT.get(lingua, SYSTEM_PROMPT["english"]).format(info=info[:24000])
     storia = get_storia(chat_id) if chat_id else []
     # Converti storia in formato Anthropic (no "system" nei messages)
@@ -1481,11 +1622,33 @@ def webhook():
                 suffisso = f"\n\n⏸️ *Pausa AI attivata* per `{target}`" if ok else "\n\n❌ Errore"
                 modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
 
-            # ── Riattiva AI ──
+            # ── Takeover: Lorenzo prende la chat ──
+            elif cb_data.startswith("TAKEOVER:"):
+                target = cb_data.split(":", 1)[1]
+                ok = set_takeover(target, True)
+                if ok:
+                    # Avvisa l'ospite nella sua lingua (best effort: usa lingua salvata in users.json)
+                    try:
+                        u = _users.get(str(target), {})
+                        lingua = u.get("lingua", "italian")
+                        msg = TAKEOVER_MSG.get(lingua, TAKEOVER_MSG["english"])
+                        if str(target).startswith("wa_"):
+                            wa_invia(str(target).replace("wa_", ""), msg)
+                        else:
+                            invia_messaggio(int(target), msg)
+                    except Exception:
+                        pass
+                    suffisso = f"\n\n💬 *Hai preso tu la chat*. L'ospite è stato avvisato. I tuoi prossimi reply arriveranno senza prefisso '💬'."
+                else:
+                    suffisso = "\n\n❌ Errore"
+                modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
+
+            # ── Riattiva AI (esce sia da pausa che da takeover) ──
             elif cb_data.startswith("RIPRENDI:"):
                 target = cb_data.split(":", 1)[1]
-                ok = set_pause(target, False)
-                suffisso = f"\n\n▶️ *AI riattivata* per `{target}`" if ok else "\n\n❌ Errore"
+                set_pause(target, False)
+                set_takeover(target, False)
+                suffisso = f"\n\n▶️ *AI riattivata* per `{target}`"
                 modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
 
             return "ok"
@@ -1577,11 +1740,13 @@ def webhook():
             match_id = re.search(r'\[ID:(\d+)\]', testo_originale)
             if match_wa:
                 wa_numero = match_wa.group(1)
-                # Inoltra a WhatsApp via Cloud API
-                wa_invia(wa_numero, f"💬 {testo}")
+                wa_session_key = f"wa_{wa_numero}"
+                # In takeover → niente prefix "💬" (sembra messaggio diretto)
+                prefix = "" if is_in_takeover(wa_session_key) else "💬 "
+                wa_invia(wa_numero, f"{prefix}{testo}")
                 # Aggiorna anche la storia conversazione lato bot
                 try:
-                    aggiorna_storia(f"wa_{wa_numero}", "[Risposta diretta di Lorenzo]", testo)
+                    aggiorna_storia(wa_session_key, "[Risposta diretta di Lorenzo]", testo)
                 except Exception:
                     pass
                 invia_messaggio(chat_id, f"✅ Risposta inviata su WhatsApp a +{wa_numero}!")
@@ -1601,7 +1766,9 @@ def webhook():
                 return "ok"
             if match_id:
                 id_ospite = int(match_id.group(1))
-                invia_messaggio(id_ospite, f"💬 {testo}")
+                # In takeover → niente prefix "💬"
+                prefix = "" if is_in_takeover(id_ospite) else "💬 "
+                invia_messaggio(id_ospite, f"{prefix}{testo}")
                 invia_messaggio(chat_id, "✅ Risposta inviata all'ospite!")
                 # Estrae la domanda sia dal formato ❓ "testo" che da ❓ testo
                 match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
@@ -1956,7 +2123,10 @@ def webhook():
                 else:
                     invia_bottoni(int(OWNER_ID),
                         f"📩 {nome_display} [ID:{chat_id}]\n\n❓ {_voce}{testo}\n\n🤖 {reply}",
-                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]]
+                        [[
+                            {"text": "💬 Prendi chat", "callback_data": f"TAKEOVER:{chat_id}"},
+                            {"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}
+                        ]]
                     )
             except Exception:
                 pass
@@ -3105,7 +3275,10 @@ def whatsapp_webhook():
                 else:
                     invia_bottoni(int(OWNER_ID),
                         f"📱 *WhatsApp* — {nome}\n\n❓ {_voce_pre_md}{testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]",
-                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}]],
+                        [[
+                            {"text": "💬 Prendi chat", "callback_data": f"TAKEOVER:{wa_session_id}"},
+                            {"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}
+                        ]],
                         parse_mode="Markdown"
                     )
             except Exception:
