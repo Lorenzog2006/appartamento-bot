@@ -3,6 +3,10 @@
     {
       "path": "/daily-report",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/cron/scheduled",
+      "schedule": "0 7 * * *"
     }
   ]
 }

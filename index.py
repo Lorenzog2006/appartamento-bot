@@ -789,6 +789,230 @@ def salva_prenotazione(chat_id, nome, checkin, checkout, lingua):
         return False
 
 
+def salva_tutte_prenotazioni(prenotazioni):
+    """Sovrascrive bookings.json con il dict completo. Usato dal cron per aggiornare flag reminder."""
+    if not GITHUB_TOKEN:
+        return False
+    try:
+        _, sha = carica_prenotazioni()
+        contenuto_nuovo = json.dumps(prenotazioni, ensure_ascii=False, indent=2)
+        payload = {
+            "message": "Aggiorna flag reminder prenotazioni",
+            "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+        }
+        if sha:
+            payload["sha"] = sha
+        req = urllib.request.Request(BOOKINGS_API, data=json.dumps(payload).encode(), headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        }, method="PUT")
+        urllib.request.urlopen(req, timeout=15)
+        return True
+    except Exception as e:
+        try:
+            log_errore("salva_prenotazioni", e)
+        except Exception:
+            pass
+        return False
+
+
+# ── Template promemoria automatici (5 lingue) ─────────────────────────────────
+PROMEMORIA_PRE_ARRIVO = {
+    "italian":  "Ciao {nome}! 😊 Domani ti aspettiamo a Juan les Pins.\n\n📅 Check-in: dalle 16:00\n🔑 Codice KeyBox: 8492\n🚗 Ingresso garage: 67 Chemin des Liserons, Antibes\n📍 https://maps.google.com/?q=67+Chemin+des+Liserons+Antibes\n\n🏠 Appartamento: 93 Bd Raymond Poincaré, piano 2°, porta 23\n📍 https://maps.google.com/?q=93+Bd+Raymond+Poincare+Antibes\n\nPer qualsiasi cosa scrivimi pure qui!",
+    "english":  "Hi {nome}! 😊 We're expecting you tomorrow in Juan les Pins.\n\n📅 Check-in: from 16:00\n🔑 KeyBox code: 8492\n🚗 Garage entrance: 67 Chemin des Liserons, Antibes\n📍 https://maps.google.com/?q=67+Chemin+des+Liserons+Antibes\n\n🏠 Apartment: 93 Bd Raymond Poincaré, 2nd floor, door 23\n📍 https://maps.google.com/?q=93+Bd+Raymond+Poincare+Antibes\n\nWrite me anytime if you need anything!",
+    "french":   "Salut {nome}! 😊 On t'attend demain à Juan les Pins.\n\n📅 Check-in: à partir de 16h\n🔑 Code KeyBox: 8492\n🚗 Entrée garage: 67 Chemin des Liserons, Antibes\n📍 https://maps.google.com/?q=67+Chemin+des+Liserons+Antibes\n\n🏠 Appartement: 93 Bd Raymond Poincaré, 2ème étage, porte 23\n📍 https://maps.google.com/?q=93+Bd+Raymond+Poincare+Antibes\n\nÉcris-moi pour toute question!",
+    "spanish":  "¡Hola {nome}! 😊 Mañana te esperamos en Juan les Pins.\n\n📅 Check-in: desde las 16:00\n🔑 Código KeyBox: 8492\n🚗 Entrada garaje: 67 Chemin des Liserons, Antibes\n📍 https://maps.google.com/?q=67+Chemin+des+Liserons+Antibes\n\n🏠 Apartamento: 93 Bd Raymond Poincaré, 2° piso, puerta 23\n📍 https://maps.google.com/?q=93+Bd+Raymond+Poincare+Antibes\n\n¡Escríbeme para cualquier cosa!",
+    "german":   "Hallo {nome}! 😊 Wir erwarten dich morgen in Juan les Pins.\n\n📅 Check-in: ab 16:00 Uhr\n🔑 KeyBox-Code: 8492\n🚗 Garage-Eingang: 67 Chemin des Liserons, Antibes\n📍 https://maps.google.com/?q=67+Chemin+des+Liserons+Antibes\n\n🏠 Wohnung: 93 Bd Raymond Poincaré, 2. Stock, Tür 23\n📍 https://maps.google.com/?q=93+Bd+Raymond+Poincare+Antibes\n\nSchreib mir bei Fragen!",
+}
+
+PROMEMORIA_ARRIVO = {
+    "italian":  "Buongiorno {nome}! 🌞 Oggi è il giorno!\n\nTutto pronto per il tuo arrivo dalle 16:00. Riepilogo veloce:\n🔑 KeyBox: codice 8492 (a 67 Chemin des Liserons)\n🚗 Posto auto: numero 53\n🏠 Appartamento 23 al 2° piano\n\nBuon viaggio! 🛣️",
+    "english":  "Good morning {nome}! 🌞 Today's the day!\n\nReady for your arrival from 16:00. Quick recap:\n🔑 KeyBox: code 8492 (at 67 Chemin des Liserons)\n🚗 Parking spot: #53\n🏠 Apartment 23 on 2nd floor\n\nSafe travels! 🛣️",
+    "french":   "Bonjour {nome}! 🌞 C'est le grand jour!\n\nTout est prêt pour ton arrivée à partir de 16h. Récap:\n🔑 KeyBox: code 8492 (à 67 Chemin des Liserons)\n🚗 Place de parking: n°53\n🏠 Appartement 23 au 2ème étage\n\nBon voyage! 🛣️",
+    "spanish":  "¡Buenos días {nome}! 🌞 ¡Hoy es el día!\n\nTodo listo para tu llegada desde las 16:00. Resumen:\n🔑 KeyBox: código 8492 (en 67 Chemin des Liserons)\n🚗 Plaza de parking: #53\n🏠 Apartamento 23 en el 2° piso\n\n¡Buen viaje! 🛣️",
+    "german":   "Guten Morgen {nome}! 🌞 Heute ist der Tag!\n\nAlles bereit für deine Ankunft ab 16:00. Zusammenfassung:\n🔑 KeyBox: Code 8492 (in 67 Chemin des Liserons)\n🚗 Parkplatz: Nr. 53\n🏠 Wohnung 23 im 2. Stock\n\nGute Reise! 🛣️",
+}
+
+PROMEMORIA_CHECKOUT = {
+    "italian":  "Buongiorno {nome}, ricorda: check-out entro le 10:00.\n\n📝 Procedura:\n1. Prendi le chiavi con te\n2. Chiudi finestre, spegni AC e luci\n3. Porta fuori i rifiuti (locale al piano terra, lato cortile)\n4. Scendi in garage, prendi l'auto\n5. Lascia chiavi + telecomando nella KeyBox e richiudila\n\nGrazie e buon viaggio! 👋",
+    "english":  "Good morning {nome}, reminder: check-out by 10:00.\n\n📝 Procedure:\n1. Take the keys with you\n2. Close windows, turn off AC and lights\n3. Take out the trash (ground floor, courtyard side)\n4. Go to garage, take your car\n5. Leave keys + remote in KeyBox and lock it\n\nThanks and safe travels! 👋",
+    "french":   "Bonjour {nome}, rappel: check-out avant 10h.\n\n📝 Procédure:\n1. Prends les clés avec toi\n2. Ferme fenêtres, éteins clim et lumières\n3. Sors les poubelles (RDC, côté cour)\n4. Descends au garage, prends ta voiture\n5. Laisse clés + télécommande dans la KeyBox et referme-la\n\nMerci et bon voyage! 👋",
+    "spanish":  "Buenos días {nome}, recordatorio: check-out antes de las 10:00.\n\n📝 Procedimiento:\n1. Llévate las llaves\n2. Cierra ventanas, apaga AC y luces\n3. Saca la basura (planta baja, lado patio)\n4. Baja al garaje, coge el coche\n5. Deja llaves + mando en la KeyBox y ciérrala\n\n¡Gracias y buen viaje! 👋",
+    "german":   "Guten Morgen {nome}, Erinnerung: Check-out bis 10:00 Uhr.\n\n📝 Ablauf:\n1. Nimm die Schlüssel mit\n2. Fenster schließen, Klima und Licht aus\n3. Müll rausbringen (EG, Hofseite)\n4. Garage runter, ins Auto\n5. Schlüssel + Fernbedienung in die KeyBox legen und abschließen\n\nDanke und gute Reise! 👋",
+}
+
+PROMEMORIA_RECENSIONE = {
+    "italian":  "Ciao {nome}! 😊 Speriamo che il tuo soggiorno a Juan les Pins sia stato fantastico.\n\nSe hai 30 secondi, una recensione su Booking o Airbnb ci aiuterebbe tantissimo. ⭐\n\nGrazie di cuore e a presto per la prossima vacanza! 🌊",
+    "english":  "Hi {nome}! 😊 We hope your stay in Juan les Pins was amazing.\n\nIf you have 30 seconds, a review on Booking or Airbnb would mean the world to us. ⭐\n\nThanks so much and see you for the next holiday! 🌊",
+    "french":   "Salut {nome}! 😊 On espère que ton séjour à Juan les Pins a été génial.\n\nSi tu as 30 secondes, un avis sur Booking ou Airbnb nous aiderait énormément. ⭐\n\nMerci infiniment et à bientôt pour les prochaines vacances! 🌊",
+    "spanish":  "¡Hola {nome}! 😊 Esperamos que tu estancia en Juan les Pins haya sido genial.\n\nSi tienes 30 segundos, una reseña en Booking o Airbnb nos ayudaría muchísimo. ⭐\n\n¡Gracias de corazón y hasta las próximas vacaciones! 🌊",
+    "german":   "Hallo {nome}! 😊 Wir hoffen dein Aufenthalt in Juan les Pins war fantastisch.\n\nWenn du 30 Sekunden hast, eine Bewertung auf Booking oder Airbnb würde uns sehr helfen. ⭐\n\nHerzlichen Dank und bis zum nächsten Urlaub! 🌊",
+}
+
+def _invia_a_cliente(chat_id_str, testo):
+    """Manda un messaggio a un cliente, gestendo sia Telegram che WhatsApp."""
+    try:
+        if str(chat_id_str).startswith("wa_"):
+            # WhatsApp: rimuovi prefix e manda via Cloud API
+            wa_invia(str(chat_id_str).replace("wa_", ""), testo)
+        else:
+            # Telegram: chat_id numerico
+            invia_messaggio(int(chat_id_str), testo)
+        return True
+    except Exception as e:
+        try:
+            log_errore("invia_a_cliente", e)
+        except Exception:
+            pass
+        return False
+
+
+def esegui_promemoria():
+    """Loop sulle prenotazioni e manda i promemoria del giorno (pre-arrivo, arrivo, check-out, recensione).
+    Idempotente: usa flag reminder_inviati per non inviare due volte."""
+    from datetime import timedelta
+    inviati = {"pre_arrivo": 0, "arrivo": 0, "check_out": 0, "recensione": 0, "errori": 0}
+    try:
+        prenotazioni, _ = carica_prenotazioni()
+        if not prenotazioni:
+            return inviati
+        oggi = datetime.now().date()
+        domani = oggi + timedelta(days=1)
+        ieri = oggi - timedelta(days=1)
+        cambiato = False
+        for chat_id, p in prenotazioni.items():
+            try:
+                ci_d = datetime.strptime(p.get("checkin", ""), "%d/%m/%Y").date()
+                co_d = datetime.strptime(p.get("checkout", ""), "%d/%m/%Y").date()
+            except Exception:
+                continue
+            lingua = p.get("lingua", "italian")
+            nome = p.get("nome", "ospite")
+            r = p.setdefault("reminder_inviati", {})
+            # PRE-ARRIVO (giorno prima)
+            if ci_d == domani and not r.get("pre_arrivo"):
+                msg = PROMEMORIA_PRE_ARRIVO.get(lingua, PROMEMORIA_PRE_ARRIVO["english"]).format(nome=nome)
+                if _invia_a_cliente(chat_id, msg):
+                    r["pre_arrivo"] = datetime.now().isoformat()
+                    inviati["pre_arrivo"] += 1
+                    cambiato = True
+                else:
+                    inviati["errori"] += 1
+            # ARRIVO (giorno stesso)
+            if ci_d == oggi and not r.get("arrivo"):
+                msg = PROMEMORIA_ARRIVO.get(lingua, PROMEMORIA_ARRIVO["english"]).format(nome=nome)
+                if _invia_a_cliente(chat_id, msg):
+                    r["arrivo"] = datetime.now().isoformat()
+                    inviati["arrivo"] += 1
+                    cambiato = True
+                else:
+                    inviati["errori"] += 1
+            # CHECK-OUT (giorno stesso)
+            if co_d == oggi and not r.get("check_out"):
+                msg = PROMEMORIA_CHECKOUT.get(lingua, PROMEMORIA_CHECKOUT["english"]).format(nome=nome)
+                if _invia_a_cliente(chat_id, msg):
+                    r["check_out"] = datetime.now().isoformat()
+                    inviati["check_out"] += 1
+                    cambiato = True
+                else:
+                    inviati["errori"] += 1
+            # RECENSIONE (giorno dopo check-out)
+            if co_d == ieri and not r.get("recensione"):
+                msg = PROMEMORIA_RECENSIONE.get(lingua, PROMEMORIA_RECENSIONE["english"]).format(nome=nome)
+                if _invia_a_cliente(chat_id, msg):
+                    r["recensione"] = datetime.now().isoformat()
+                    inviati["recensione"] += 1
+                    cambiato = True
+                else:
+                    inviati["errori"] += 1
+        if cambiato:
+            salva_tutte_prenotazioni(prenotazioni)
+    except Exception as e:
+        try:
+            log_errore("cron_promemoria", e)
+        except Exception:
+            pass
+        inviati["errori"] += 1
+    return inviati
+
+
+def esegui_report_mensile():
+    """Genera e manda a Lorenzo il report del mese appena trascorso."""
+    try:
+        ora = datetime.now()
+        # Mese precedente
+        if ora.month == 1:
+            mese_p = 12
+            anno_p = ora.year - 1
+        else:
+            mese_p = ora.month - 1
+            anno_p = ora.year
+        nomi_mesi = ["", "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+                     "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
+        mese_nome = nomi_mesi[mese_p]
+
+        # Stats lifetime
+        s, _ = carica_stats()
+        totale = s.get("totale", 0)
+        argomenti = s.get("argomenti", {})
+        lingue = s.get("lingue", {})
+
+        # Users
+        _carica_users_da_github()
+        n_clienti = len(_users)
+        ora_iso = datetime.now()
+        attivi_7gg = 0
+        nuovi_mese = 0
+        for u in _users.values():
+            try:
+                primo = datetime.strptime((u.get("primo_msg", "") or "")[:7], "%Y-%m")
+                if primo.year == anno_p and primo.month == mese_p:
+                    nuovi_mese += 1
+            except Exception:
+                pass
+            try:
+                ult = datetime.strptime((u.get("ultimo_msg", "") or "")[:19], "%Y-%m-%dT%H:%M:%S")
+                if (ora_iso - ult).total_seconds() < 7 * 86400:
+                    attivi_7gg += 1
+            except Exception:
+                pass
+
+        # Prenotazioni
+        prenotazioni, _ = carica_prenotazioni()
+        n_pren = len(prenotazioni)
+
+        # Argomenti top 5
+        top_arg = sorted(argomenti.items(), key=lambda x: -x[1])[:5]
+        arg_str = "\n".join([f"{i+1}. {k.capitalize()}: {v}" for i, (k, v) in enumerate(top_arg)]) or "—"
+
+        # Lingue top 5
+        top_ling = sorted(lingue.items(), key=lambda x: -x[1])[:5]
+        ling_str = "\n".join([f"• {k.capitalize()}: {v}" for k, v in top_ling]) or "—"
+
+        dash_url = f"https://appartamento-bot.vercel.app/dashboard?key={DASHBOARD_KEY}" if DASHBOARD_KEY else "(dashboard non configurata)"
+
+        report = (
+            f"📊 *REPORT {mese_nome.upper()} {anno_p}*\n\n"
+            f"💬 *Totale messaggi lifetime*: {totale}\n\n"
+            f"🌍 *Lingue (lifetime)*:\n{ling_str}\n\n"
+            f"🏷️ *Top 5 argomenti (lifetime)*:\n{arg_str}\n\n"
+            f"👥 *Clienti*:\n• Totali registrati: {n_clienti}\n• Nuovi questo mese: {nuovi_mese}\n• Attivi negli ultimi 7gg: {attivi_7gg}\n\n"
+            f"📅 *Prenotazioni totali*: {n_pren}\n\n"
+            f"🔗 [Apri dashboard completa]({dash_url})"
+        )
+        if OWNER_ID:
+            invia_messaggio(int(OWNER_ID), report, parse_mode="Markdown")
+        return True
+    except Exception as e:
+        try:
+            log_errore("report_mensile", e)
+        except Exception:
+            pass
+        return False
+
+
 # ── Stats ─────────────────────────────────────────────────────────────────────
 TOPIC_KEYWORDS = {
     "wifi":         ["wifi","password","internet","connessione","rete","wlan","réseau","mot de passe","contraseña"],
@@ -2226,6 +2450,45 @@ def reset_keyboards():
         return f"ok — tastiera rimossa per {count} utenti"
     except Exception as e:
         return f"errore: {e}"
+
+@app.route("/cron/scheduled", methods=["GET", "POST"])
+def cron_scheduled():
+    """Endpoint cron unificato. Eseguito ogni mattina. Decide cosa fare in base alla data."""
+    # Auth: Vercel cron arriva senza header speciale. Accettiamo o header CRON_SECRET o
+    # User-Agent vercel-cron (Vercel firma le sue cron call con questo).
+    auth_ok = False
+    cron_secret = os.environ.get("CRON_SECRET", "").strip()
+    if cron_secret and request.headers.get("Authorization") == f"Bearer {cron_secret}":
+        auth_ok = True
+    ua = request.headers.get("User-Agent", "").lower()
+    if "vercel" in ua:
+        auth_ok = True
+    if not auth_ok:
+        return ("Forbidden", 403)
+
+    risultato = {"promemoria": None, "report_mensile": None}
+    # Sempre: esegui promemoria
+    try:
+        risultato["promemoria"] = esegui_promemoria()
+    except Exception as e:
+        try:
+            log_errore("cron_promemoria_outer", e)
+        except Exception:
+            pass
+        risultato["promemoria"] = "errore"
+
+    # Solo il 1° del mese: report mensile
+    try:
+        if datetime.now().day == 1:
+            risultato["report_mensile"] = esegui_report_mensile()
+    except Exception as e:
+        try:
+            log_errore("cron_report_outer", e)
+        except Exception:
+            pass
+
+    return json.dumps(risultato)
+
 
 @app.route("/")
 def health():
