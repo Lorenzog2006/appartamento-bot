@@ -978,7 +978,7 @@ def invia_bottoni(chat_id, testo, bottoni, parse_mode=None):
         payload["parse_mode"] = parse_mode
     telegram("sendMessage", payload)
 
-def modifica_messaggio(chat_id, message_id, testo, parse_mode=None):
+def modifica_messaggio(chat_id, message_id, testo, parse_mode=None, bottoni=None):
     try:
         payload = {
             "chat_id": chat_id,
@@ -987,6 +987,8 @@ def modifica_messaggio(chat_id, message_id, testo, parse_mode=None):
         }
         if parse_mode:
             payload["parse_mode"] = parse_mode
+        if bottoni is not None:
+            payload["reply_markup"] = {"inline_keyboard": bottoni}
         telegram("editMessageText", payload)
     except Exception:
         pass
@@ -1619,8 +1621,12 @@ def webhook():
             elif cb_data.startswith("PAUSA:"):
                 target = cb_data.split(":", 1)[1]
                 ok = set_pause(target, True)
-                suffisso = f"\n\n⏸️ *Pausa AI attivata* per `{target}`" if ok else "\n\n❌ Errore"
-                modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
+                if ok:
+                    suffisso = f"\n\n⏸️ *Pausa AI attivata* per `{target}`"
+                    nuovi_bottoni = [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{target}"}]]
+                    modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown", bottoni=nuovi_bottoni)
+                else:
+                    modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + "\n\n❌ Errore", parse_mode="Markdown")
 
             # ── Takeover: Lorenzo prende la chat ──
             elif cb_data.startswith("TAKEOVER:"):
@@ -1638,18 +1644,20 @@ def webhook():
                             invia_messaggio(int(target), msg)
                     except Exception:
                         pass
-                    suffisso = f"\n\n💬 *Hai preso tu la chat*. L'ospite è stato avvisato. I tuoi prossimi reply arriveranno senza prefisso '💬'."
+                    suffisso = f"\n\n💬 *Hai preso tu la chat.* L'ospite è stato avvisato. I tuoi prossimi reply arriveranno senza prefisso '💬'.\n\n⏹️ Quando hai finito, premi il bottone qui sotto per ridare il controllo al bot."
+                    nuovi_bottoni = [[{"text": "▶️ Riattiva AI (fine takeover)", "callback_data": f"RIPRENDI:{target}"}]]
+                    modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown", bottoni=nuovi_bottoni)
                 else:
-                    suffisso = "\n\n❌ Errore"
-                modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
+                    modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + "\n\n❌ Errore", parse_mode="Markdown")
 
             # ── Riattiva AI (esce sia da pausa che da takeover) ──
             elif cb_data.startswith("RIPRENDI:"):
                 target = cb_data.split(":", 1)[1]
                 set_pause(target, False)
                 set_takeover(target, False)
-                suffisso = f"\n\n▶️ *AI riattivata* per `{target}`"
-                modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown")
+                suffisso = f"\n\n▶️ *AI riattivata* per `{target}`. Il bot risponderà di nuovo automaticamente."
+                # Rimuove i bottoni (nessuno più necessario)
+                modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown", bottoni=[])
 
             return "ok"
 
@@ -1742,14 +1750,23 @@ def webhook():
                 wa_numero = match_wa.group(1)
                 wa_session_key = f"wa_{wa_numero}"
                 # In takeover → niente prefix "💬" (sembra messaggio diretto)
-                prefix = "" if is_in_takeover(wa_session_key) else "💬 "
+                in_takeover = is_in_takeover(wa_session_key)
+                prefix = "" if in_takeover else "💬 "
                 wa_invia(wa_numero, f"{prefix}{testo}")
                 # Aggiorna anche la storia conversazione lato bot
                 try:
                     aggiorna_storia(wa_session_key, "[Risposta diretta di Lorenzo]", testo)
                 except Exception:
                     pass
-                invia_messaggio(chat_id, f"✅ Risposta inviata su WhatsApp a +{wa_numero}!")
+                # Conferma a Lorenzo. Se in takeover, includi anche bottone Riattiva AI.
+                if in_takeover:
+                    invia_bottoni(chat_id,
+                        f"✅ Risposta inviata su WhatsApp a +{wa_numero}\n\n💬 _Sei in takeover._ Continua pure a rispondere oppure ridai il controllo al bot 👇",
+                        [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{wa_session_key}"}]],
+                        parse_mode="Markdown"
+                    )
+                else:
+                    invia_messaggio(chat_id, f"✅ Risposta inviata su WhatsApp a +{wa_numero}!")
                 # Offri di salvare in memoria
                 match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
                 if not match_domanda:
@@ -1767,9 +1784,17 @@ def webhook():
             if match_id:
                 id_ospite = int(match_id.group(1))
                 # In takeover → niente prefix "💬"
-                prefix = "" if is_in_takeover(id_ospite) else "💬 "
+                in_takeover = is_in_takeover(id_ospite)
+                prefix = "" if in_takeover else "💬 "
                 invia_messaggio(id_ospite, f"{prefix}{testo}")
-                invia_messaggio(chat_id, "✅ Risposta inviata all'ospite!")
+                if in_takeover:
+                    invia_bottoni(chat_id,
+                        f"✅ Risposta inviata\n\n💬 _Sei in takeover._ Continua pure a rispondere oppure ridai il controllo al bot 👇",
+                        [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{id_ospite}"}]],
+                        parse_mode="Markdown"
+                    )
+                else:
+                    invia_messaggio(chat_id, "✅ Risposta inviata all'ospite!")
                 # Estrae la domanda sia dal formato ❓ "testo" che da ❓ testo
                 match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
                 if not match_domanda:
