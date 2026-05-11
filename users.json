@@ -13,7 +13,7 @@
     "nome": "Lorenzo",
     "lingua": "italian",
     "ultimo_msg": "2026-05-11T12:23:10",
-    "in_takeover": true,
+    "in_takeover": false,
     "pausa_ai": false
   }
 }
