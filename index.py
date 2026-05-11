@@ -964,15 +964,53 @@ PROMEMORIA_RECENSIONE = {
     "german":   "Hallo {nome}! 😊 Wir hoffen dein Aufenthalt in Juan les Pins war fantastisch.\n\nWenn du 30 Sekunden hast, eine Bewertung auf Booking oder Airbnb würde uns sehr helfen. ⭐\n\nHerzlichen Dank und bis zum nächsten Urlaub! 🌊",
 }
 
-def _invia_a_cliente(chat_id_str, testo):
-    """Manda un messaggio a un cliente, gestendo sia Telegram che WhatsApp."""
+def _invia_a_cliente(chat_id_str, testo, nome_ospite="ospite", tipo_promemoria=""):
+    """Invio promemoria a un cliente.
+    - Telegram (chat_id numerico): invio diretto, automatico
+    - WhatsApp (wa_xxx) o manuale: NON invio direttamente. Invece notifico
+      Lorenzo su Telegram con il testo pronto + link wa.me cliccabile
+      per copia-incolla immediato in WhatsApp.
+    Questo approccio aggira la restrizione finestra-24h di Meta."""
     try:
-        if str(chat_id_str).startswith("wa_"):
-            # WhatsApp: rimuovi prefix e manda via Cloud API
-            wa_invia(str(chat_id_str).replace("wa_", ""), testo)
+        cid = str(chat_id_str)
+        # Telegram: invio automatico
+        if cid.isdigit():
+            invia_messaggio(int(cid), testo)
+            return True
+        # WhatsApp o manuale: notifica Lorenzo per invio manuale
+        if not OWNER_ID:
+            return False
+        import urllib.parse as _urlp
+        numero_wa = None
+        if cid.startswith("wa_"):
+            numero_wa = cid.replace("wa_", "")
+            link_wa = f"https://wa.me/{numero_wa}?text={_urlp.quote(testo)}"
+            etichetta_canale = f"📱 WhatsApp: +{numero_wa}"
+            bottoni = [[
+                {"text": "📲 Apri WhatsApp con messaggio precompilato", "url": link_wa}
+            ]]
         else:
-            # Telegram: chat_id numerico
-            invia_messaggio(int(chat_id_str), testo)
+            # Prenotazione manuale senza canale
+            etichetta_canale = "📝 _Nessun canale impostato — copia manualmente_"
+            bottoni = None
+        tipo_label = {
+            "pre_arrivo": "📬 PROMEMORIA PRE-ARRIVO",
+            "arrivo": "🌞 PROMEMORIA GIORNO DI ARRIVO",
+            "check_out": "🏁 PROMEMORIA CHECK-OUT",
+            "recensione": "⭐ RICHIESTA RECENSIONE",
+        }.get(tipo_promemoria, "📤 PROMEMORIA")
+        # Messaggio a Lorenzo con testo in blocco code per copia-incolla facile
+        msg_a_lorenzo = (
+            f"{tipo_label}\n\n"
+            f"👤 Ospite: *{nome_ospite}*\n"
+            f"{etichetta_canale}\n\n"
+            f"💬 *Testo da inviare:*\n\n"
+            f"```\n{testo}\n```"
+        )
+        if bottoni:
+            invia_bottoni(int(OWNER_ID), msg_a_lorenzo, bottoni, parse_mode="Markdown")
+        else:
+            invia_messaggio(int(OWNER_ID), msg_a_lorenzo, parse_mode="Markdown")
         return True
     except Exception as e:
         try:
@@ -1007,7 +1045,7 @@ def esegui_promemoria():
             # PRE-ARRIVO (giorno prima)
             if ci_d == domani and not r.get("pre_arrivo"):
                 msg = PROMEMORIA_PRE_ARRIVO.get(lingua, PROMEMORIA_PRE_ARRIVO["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg):
+                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="pre_arrivo"):
                     r["pre_arrivo"] = datetime.now().isoformat()
                     inviati["pre_arrivo"] += 1
                     cambiato = True
@@ -1016,7 +1054,7 @@ def esegui_promemoria():
             # ARRIVO (giorno stesso)
             if ci_d == oggi and not r.get("arrivo"):
                 msg = PROMEMORIA_ARRIVO.get(lingua, PROMEMORIA_ARRIVO["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg):
+                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="arrivo"):
                     r["arrivo"] = datetime.now().isoformat()
                     inviati["arrivo"] += 1
                     cambiato = True
@@ -1025,7 +1063,7 @@ def esegui_promemoria():
             # CHECK-OUT (giorno stesso)
             if co_d == oggi and not r.get("check_out"):
                 msg = PROMEMORIA_CHECKOUT.get(lingua, PROMEMORIA_CHECKOUT["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg):
+                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="check_out"):
                     r["check_out"] = datetime.now().isoformat()
                     inviati["check_out"] += 1
                     cambiato = True
@@ -1034,7 +1072,7 @@ def esegui_promemoria():
             # RECENSIONE (giorno dopo check-out)
             if co_d == ieri and not r.get("recensione"):
                 msg = PROMEMORIA_RECENSIONE.get(lingua, PROMEMORIA_RECENSIONE["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg):
+                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="recensione"):
                     r["recensione"] = datetime.now().isoformat()
                     inviati["recensione"] += 1
                     cambiato = True
