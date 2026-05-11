@@ -23,6 +23,7 @@ DAILY_STATS_API = f"https://api.github.com/repos/{REPO}/contents/daily_stats.jso
 BOOKINGS_API    = f"https://api.github.com/repos/{REPO}/contents/bookings.json"
 CONVERSATIONS_API = f"https://api.github.com/repos/{REPO}/contents/conversations.json"
 USERS_API       = f"https://api.github.com/repos/{REPO}/contents/users.json"
+ANALYTICS_API   = f"https://api.github.com/repos/{REPO}/contents/analytics.json"
 INFO_PATH    = os.path.join(os.path.dirname(__file__), "appartamento.txt")
 
 # ── Stato sessioni ────────────────────────────────────────────────────────────
@@ -381,6 +382,116 @@ def aggiorna_user(chat_id, canale, nome, testo, lingua=None, username=None):
         u["totale_msg"] = int(u.get("totale_msg", 0)) + 1
         topic = _topic_di(testo)
         u["topic_count"][topic] = int(u["topic_count"].get(topic, 0)) + 1
+        _users[cid] = u
+        _salva_users_su_github()
+    except Exception:
+        pass
+
+
+# ── Analytics: traccia eventi per heatmap, tempi risposta, trending ────────────
+_analytics = []
+_analytics_sha = None
+_analytics_loaded = False
+ANALYTICS_MAX_GIORNI = 30   # ritengo solo ultimi 30gg
+ANALYTICS_MAX_EVENTI = 5000 # safety cap
+
+def _carica_analytics_da_github():
+    global _analytics, _analytics_sha, _analytics_loaded
+    if _analytics_loaded or not GITHUB_TOKEN:
+        _analytics_loaded = True
+        return
+    try:
+        url = f"{ANALYTICS_API}?t={int(datetime.now().timestamp())}"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=4)
+        data = json.loads(r.read())
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        _analytics = json.loads(contenuto) if contenuto.strip() else []
+        _analytics_sha = data["sha"]
+        # Cleanup: rimuovi eventi più vecchi di ANALYTICS_MAX_GIORNI giorni
+        from datetime import timedelta as _td
+        cutoff = (datetime.now() - _td(days=ANALYTICS_MAX_GIORNI)).strftime("%Y-%m-%dT%H:%M:%S")
+        _analytics = [e for e in _analytics if e.get("ts", "") >= cutoff]
+        # Cap totale eventi
+        if len(_analytics) > ANALYTICS_MAX_EVENTI:
+            _analytics = _analytics[-ANALYTICS_MAX_EVENTI:]
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            _analytics = []
+            _analytics_sha = None
+    except Exception:
+        pass
+    finally:
+        _analytics_loaded = True
+
+def _salva_analytics_su_github():
+    global _analytics_sha
+    if not GITHUB_TOKEN:
+        return
+    try:
+        contenuto_nuovo = json.dumps(_analytics, ensure_ascii=False)
+        payload = {
+            "message": "Aggiorna analytics events",
+            "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+        }
+        if _analytics_sha:
+            payload["sha"] = _analytics_sha
+        req = urllib.request.Request(ANALYTICS_API, data=json.dumps(payload).encode(), headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        }, method="PUT")
+        r = urllib.request.urlopen(req, timeout=8)
+        risposta = json.loads(r.read())
+        _analytics_sha = risposta.get("content", {}).get("sha", _analytics_sha)
+    except urllib.error.HTTPError as e:
+        if e.code in (409, 422):
+            global _analytics_loaded
+            _analytics_loaded = False
+            _carica_analytics_da_github()
+    except Exception:
+        pass
+
+def log_evento_analytics(canale, topic, durata_sec, takeover=False, non_risolto=False, era_vocale=False):
+    """Aggiunge un evento al log analytics. Best-effort, non blocca."""
+    try:
+        _carica_analytics_da_github()
+        evento = {
+            "ts": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "ch": canale[:2],          # "te" o "wh"
+            "tp": (topic or "altro")[:20],
+            "ds": round(float(durata_sec), 2) if durata_sec else 0,
+            "to": bool(takeover),
+            "nr": bool(non_risolto),
+            "vo": bool(era_vocale),
+        }
+        _analytics.append(evento)
+        # Auto-cleanup se troppi
+        if len(_analytics) > ANALYTICS_MAX_EVENTI + 100:
+            del _analytics[:100]
+        _salva_analytics_su_github()
+    except Exception:
+        pass
+
+def log_msg_non_risolto(testo, chat_id, lingua):
+    """Salva la domanda non risolta in users.json sotto un campo dedicato."""
+    try:
+        _carica_users_da_github()
+        cid = str(chat_id)
+        u = _users.get(cid) or {}
+        u.setdefault("non_risolti", [])
+        if len(u["non_risolti"]) >= 20:
+            u["non_risolti"] = u["non_risolti"][-19:]  # max 20 per utente
+        u["non_risolti"].append({
+            "ts": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "domanda": (testo or "")[:200],
+            "lingua": lingua
+        })
         _users[cid] = u
         _salva_users_su_github()
     except Exception:
@@ -2475,6 +2586,7 @@ def webhook():
             return "ok"
 
         # ── Risposta AI ─────────────────────────────────────────────────────
+        t_start = datetime.now().timestamp()
         try:
             info  = leggi_info()
             reply = chiedi_ai(testo, info, chat_id=chat_id)
@@ -2485,6 +2597,14 @@ def webhook():
                 aggiorna_daily_stats(testo, lingua_stat, chat_id)
                 if not is_owner:
                     aggiorna_user(chat_id, "telegram", nome, testo, lingua_stat, username)
+                # Analytics
+                durata_sec = datetime.now().timestamp() - t_start
+                non_risolto = bot_non_sa(reply)
+                log_evento_analytics("telegram", _topic_di(testo), durata_sec,
+                                     takeover=False, non_risolto=non_risolto,
+                                     era_vocale=era_vocale)
+                if non_risolto and not is_owner:
+                    log_msg_non_risolto(testo, chat_id, lingua_stat)
             except Exception:
                 pass
         except Exception:
@@ -2878,6 +2998,109 @@ def _aggrega_dashboard_data():
     return out
 
 
+def _aggrega_analytics():
+    """Aggrega le metriche analytics avanzate per la dashboard."""
+    out = {
+        "tempo_medio_sec": 0,
+        "tempo_p50": 0, "tempo_p90": 0,
+        "tasso_takeover": 0,
+        "tasso_non_risolti": 0,
+        "tasso_vocali": 0,
+        "totale_eventi_30gg": 0,
+        "heatmap": [[0]*24 for _ in range(7)],  # 7 giorni x 24 ore
+        "trending": [],
+        "distrib_tempi": {"0-2s": 0, "2-5s": 0, "5-10s": 0, "10s+": 0},
+        "top_non_risolti": [],
+        "generato_il": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    }
+    try:
+        _carica_analytics_da_github()
+        from datetime import timedelta as _td
+        ora = datetime.now()
+        sette_gg = (ora - _td(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
+        quattordici_gg = (ora - _td(days=14)).strftime("%Y-%m-%dT%H:%M:%S")
+        durate = []
+        n_takeover = 0
+        n_non_risolti = 0
+        n_vocali = 0
+        topic_7gg = {}
+        topic_7_14gg = {}
+        for e in _analytics:
+            ts = e.get("ts", "")
+            out["totale_eventi_30gg"] += 1
+            # Durata
+            ds = float(e.get("ds") or 0)
+            durate.append(ds)
+            if ds < 2: out["distrib_tempi"]["0-2s"] += 1
+            elif ds < 5: out["distrib_tempi"]["2-5s"] += 1
+            elif ds < 10: out["distrib_tempi"]["5-10s"] += 1
+            else: out["distrib_tempi"]["10s+"] += 1
+            # Counters
+            if e.get("to"): n_takeover += 1
+            if e.get("nr"): n_non_risolti += 1
+            if e.get("vo"): n_vocali += 1
+            # Heatmap (giorno settimana × ora)
+            try:
+                dt = datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
+                # weekday(): 0=lun, 6=dom
+                out["heatmap"][dt.weekday()][dt.hour] += 1
+            except Exception:
+                pass
+            # Trending: confronto 7gg vs 7-14gg
+            tp = e.get("tp", "altro")
+            if ts >= sette_gg:
+                topic_7gg[tp] = topic_7gg.get(tp, 0) + 1
+            elif ts >= quattordici_gg:
+                topic_7_14gg[tp] = topic_7_14gg.get(tp, 0) + 1
+        n = len(durate)
+        if n:
+            out["tempo_medio_sec"] = round(sum(durate)/n, 2)
+            durate_ord = sorted(durate)
+            out["tempo_p50"] = round(durate_ord[n//2], 2)
+            out["tempo_p90"] = round(durate_ord[int(n*0.9)] if n > 1 else durate_ord[0], 2)
+            out["tasso_takeover"] = round(n_takeover/n*100, 1)
+            out["tasso_non_risolti"] = round(n_non_risolti/n*100, 1)
+            out["tasso_vocali"] = round(n_vocali/n*100, 1)
+        # Trending: tutti i topic visti
+        all_topics = set(topic_7gg.keys()) | set(topic_7_14gg.keys())
+        for tp in all_topics:
+            v7 = topic_7gg.get(tp, 0)
+            v14 = topic_7_14gg.get(tp, 0)
+            if v14 > 0:
+                delta_pct = int((v7 - v14)/v14*100)
+            else:
+                delta_pct = 100 if v7 > 0 else 0
+            out["trending"].append({
+                "topic": tp,
+                "ultimi_7gg": v7,
+                "precedenti_7gg": v14,
+                "delta_pct": delta_pct
+            })
+        out["trending"].sort(key=lambda x: -x["ultimi_7gg"])
+        out["trending"] = out["trending"][:10]
+    except Exception:
+        pass
+    # Top messaggi non risolti (da users.json)
+    try:
+        _carica_users_da_github()
+        all_nr = []
+        for cid, u in _users.items():
+            nome = u.get("nome", "?")
+            for nr in u.get("non_risolti", []):
+                all_nr.append({
+                    "ts": nr.get("ts", ""),
+                    "domanda": nr.get("domanda", ""),
+                    "lingua": nr.get("lingua", ""),
+                    "nome": nome,
+                    "chat_id": cid
+                })
+        all_nr.sort(key=lambda x: x["ts"], reverse=True)
+        out["top_non_risolti"] = all_nr[:15]
+    except Exception:
+        pass
+    return out
+
+
 def _aggrega_costi():
     """Aggrega tutti i costi (Meta + Claude stimati) per la sezione Costi."""
     meta = costi_meta(30)
@@ -2909,6 +3132,14 @@ def dashboard_api_costi():
         return ("Forbidden", 403)
     from flask import jsonify
     return jsonify(_aggrega_costi())
+
+
+@app.route("/dashboard/api/analytics")
+def dashboard_api_analytics():
+    if not _check_dash_key():
+        return ("Forbidden", 403)
+    from flask import jsonify
+    return jsonify(_aggrega_analytics())
 
 
 @app.route("/dashboard/conversation/<path:chat_id>")
@@ -3083,6 +3314,23 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .cat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:6px;font-size:13px}
 .cat-row .free{color:var(--accent);font-weight:600}
 .cat-row .paid{color:#f7c84a;font-weight:600}
+.heatmap-wrap{overflow-x:auto;background:rgba(255,255,255,.04);border-radius:14px;padding:14px}
+.heatmap{display:inline-grid;grid-template-columns:auto repeat(24,minmax(14px,1fr));gap:2px;font-size:10px;color:var(--txt-mute);min-width:600px}
+.heatmap .hcorner{background:transparent}
+.heatmap .hour-label{text-align:center;padding:2px;color:var(--txt-mute)}
+.heatmap .day-label{padding:2px 6px 2px 0;text-align:right;font-weight:600;color:#fff}
+.heatmap .cell{height:18px;border-radius:3px;background:rgba(255,255,255,.06)}
+.tempi-row{display:flex;gap:8px;margin-bottom:10px}
+.tempi-cell{flex:1;background:rgba(255,255,255,.04);border-radius:10px;padding:12px;text-align:center}
+.tempi-cell .v{font-size:18px;font-weight:700;color:#fff}
+.tempi-cell .l{font-size:10.5px;color:var(--txt-mute);margin-top:3px;text-transform:uppercase}
+.trending-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:6px;font-size:13px}
+.trending-row .delta-up{color:var(--accent);font-weight:600}
+.trending-row .delta-down{color:#e84141;font-weight:600}
+.trending-row .delta-flat{color:var(--txt-mute)}
+.nr-row{background:rgba(255,196,77,.08);border-left:3px solid #f7c84a;padding:10px 14px;border-radius:8px;margin-bottom:6px;font-size:13px}
+.nr-row .domanda{color:#fff;margin-bottom:4px}
+.nr-row .meta{font-size:11px;color:var(--txt-mute)}
 </style>
 </head>
 <body>
@@ -3118,6 +3366,20 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
   <div id="prenPassate"></div>
 </div>
 
+<!-- VIEW ANALYTICS -->
+<div class="view" id="view-analytics">
+  <div class="section">Performance bot (ultimi 30 giorni)</div>
+  <div class="kpis" id="analyticsKpis"></div>
+  <div class="section">Distribuzione tempi risposta</div>
+  <div id="analyticsTempi"></div>
+  <div class="section">📈 Trending argomenti (ultimi 7gg vs precedenti)</div>
+  <div id="analyticsTrending"></div>
+  <div class="section">🔥 Heatmap traffico (giorno × ora)</div>
+  <div class="heatmap-wrap" id="analyticsHeatmap"></div>
+  <div class="section">⚠️ Top messaggi non risolti</div>
+  <div id="analyticsNonRisolti"></div>
+</div>
+
 <!-- VIEW 5: COSTI -->
 <div class="view" id="view-costi">
   <div class="section">Costi servizi (ultimi 30 giorni)</div>
@@ -3148,8 +3410,9 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 <nav class="tabs">
   <button class="tab active" data-view="clienti"><span class="ti">👥</span>Clienti</button>
   <button class="tab" data-view="argomenti"><span class="ti">💡</span>Argom.</button>
-  <button class="tab" data-view="prenotazioni"><span class="ti">📅</span>Prenot.</button>
+  <button class="tab" data-view="prenotazioni"><span class="ti">📅</span>Pren.</button>
   <button class="tab" data-view="stats"><span class="ti">📊</span>Stats</button>
+  <button class="tab" data-view="analytics"><span class="ti">📈</span>Analyt.</button>
   <button class="tab" data-view="costi"><span class="ti">💰</span>Costi</button>
 </nav>
 
@@ -3332,6 +3595,84 @@ function fmtEur(v){
   return v.toLocaleString('it-IT',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:4});
 }
 
+let ANALYTICS=null;
+async function caricaAnalytics(){
+  try{
+    const r=await fetch('/dashboard/api/analytics?key='+encodeURIComponent(KEY));
+    if(!r.ok)return;
+    ANALYTICS=await r.json();
+    renderAnalytics();
+  }catch(e){}
+}
+
+function renderAnalytics(){
+  if(!ANALYTICS)return;
+  const A=ANALYTICS;
+  // KPI
+  document.getElementById('analyticsKpis').innerHTML=[
+    [A.tempo_medio_sec+'s','Tempo medio'],
+    [A.tempo_p90+'s','P90 (90% sotto)'],
+    [A.tasso_takeover+'%','Takeover'],
+    [A.tasso_non_risolti+'%','Non risolti'],
+    [A.tasso_vocali+'%','Vocali'],
+    [A.totale_eventi_30gg,'Eventi 30gg'],
+  ].map(([v,l])=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  // Distribuzione tempi
+  const dt=A.distrib_tempi||{};
+  const totDt=Object.values(dt).reduce((a,b)=>a+b,0)||1;
+  document.getElementById('analyticsTempi').innerHTML='<div class="tempi-row">'+
+    Object.entries(dt).map(([k,v])=>{
+      const pct=Math.round(v/totDt*100);
+      return `<div class="tempi-cell"><div class="v">${v}</div><div class="l">${k} (${pct}%)</div></div>`;
+    }).join('')+'</div>';
+  // Trending
+  const tr=A.trending||[];
+  if(tr.length){
+    document.getElementById('analyticsTrending').innerHTML=tr.map(t=>{
+      const arrow=t.delta_pct>10?'📈':(t.delta_pct<-10?'📉':'➡️');
+      const cls=t.delta_pct>10?'delta-up':(t.delta_pct<-10?'delta-down':'delta-flat');
+      const sign=t.delta_pct>=0?'+':'';
+      return `<div class="trending-row">
+        <span>${arrow} ${escapeHtml(t.topic)}</span>
+        <span>${t.ultimi_7gg} msg <span class="${cls}">${sign}${t.delta_pct}%</span></span>
+      </div>`;
+    }).join('');
+  }else{
+    document.getElementById('analyticsTrending').innerHTML='<div class="empty">Dati insufficienti. Servono almeno 14 giorni di attività.</div>';
+  }
+  // Heatmap
+  const hm=A.heatmap||[];
+  const giorni=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+  let maxVal=0;
+  hm.forEach(row=>row.forEach(v=>{if(v>maxVal)maxVal=v}));
+  let html='<div class="heatmap"><div class="hcorner"></div>';
+  for(let h=0;h<24;h++)html+=`<div class="hour-label">${h}</div>`;
+  for(let d=0;d<7;d++){
+    html+=`<div class="day-label">${giorni[d]}</div>`;
+    for(let h=0;h<24;h++){
+      const v=hm[d]?hm[d][h]||0:0;
+      const intensity=maxVal>0?v/maxVal:0;
+      const color=intensity===0?'rgba(255,255,255,.04)':`rgba(34,197,94,${0.15+intensity*0.85})`;
+      html+=`<div class="cell" style="background:${color}" title="${giorni[d]} ${h}:00 — ${v} msg"></div>`;
+    }
+  }
+  html+='</div>';
+  document.getElementById('analyticsHeatmap').innerHTML=html;
+  // Non risolti
+  const nr=A.top_non_risolti||[];
+  if(nr.length){
+    document.getElementById('analyticsNonRisolti').innerHTML=nr.map(n=>{
+      const data=(n.ts||'').substring(0,10);
+      return `<div class="nr-row">
+        <div class="domanda">"${escapeHtml(n.domanda)}"</div>
+        <div class="meta">— ${escapeHtml(n.nome)} (${escapeHtml(n.lingua||'?')}) · ${data}</div>
+      </div>`;
+    }).join('');
+  }else{
+    document.getElementById('analyticsNonRisolti').innerHTML='<div class="empty">Nessuna domanda non risolta. Bravo bot! 🎉</div>';
+  }
+}
+
 let COSTI=null;
 async function caricaCosti(){
   try{
@@ -3419,7 +3760,8 @@ async function caricaDati(){
 }
 caricaDati();
 caricaCosti();
-setInterval(()=>{caricaDati();caricaCosti()},60000);
+caricaAnalytics();
+setInterval(()=>{caricaDati();caricaCosti();caricaAnalytics()},60000);
 </script>
 </body>
 </html>"""
@@ -3711,13 +4053,21 @@ def whatsapp_webhook():
                 wa_invia(wa_from, "Benvenuto! 😊 Sono l'assistente virtuale dell'appartamento. Come posso aiutarti?")
 
         # Risposta AI (riusa tutta la logica esistente)
+        t_start_wa = datetime.now().timestamp()
         info  = leggi_info()
         reply = chiedi_ai(testo, info, chat_id=wa_session_id)
         aggiorna_storia(wa_session_id, testo, reply)
-        # Aggiorna anagrafica utente (per dashboard)
+        # Aggiorna anagrafica utente (per dashboard) + analytics
         try:
             lingua_stat = rileva_lingua(testo)
             aggiorna_user(wa_session_id, "whatsapp", nome, testo, lingua_stat, None)
+            durata_sec_wa = datetime.now().timestamp() - t_start_wa
+            non_risolto_wa = bot_non_sa(reply)
+            log_evento_analytics("whatsapp", _topic_di(testo), durata_sec_wa,
+                                 takeover=False, non_risolto=non_risolto_wa,
+                                 era_vocale=era_vocale)
+            if non_risolto_wa:
+                log_msg_non_risolto(testo, wa_session_id, lingua_stat)
         except Exception:
             pass
 
