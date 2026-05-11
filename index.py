@@ -1735,9 +1735,9 @@ def webhook():
         # ── Proprietario risponde a notifica → inoltra all'ospite ──
         if is_owner and message.get("reply_to_message"):
             testo_originale = message["reply_to_message"].get("text", "")
-            # Cerca prima [WA:numero] (ospite WhatsApp), poi [ID:numero] (ospite Telegram)
-            match_wa = re.search(r'\[WA:(\d+)\]', testo_originale)
-            match_id = re.search(r'\[ID:(\d+)\]', testo_originale)
+            # Regex tollerante: matcha sia [WA:393], WA:393, WA-393, 🆔WA:393 ecc.
+            match_wa = re.search(r'WA[:\-]\s*(\d{8,})', testo_originale)
+            match_id = re.search(r'\bID[:\-]\s*(\d{4,})', testo_originale)
             if match_wa:
                 wa_numero = match_wa.group(1)
                 wa_session_key = f"wa_{wa_numero}"
@@ -1784,6 +1784,17 @@ def webhook():
                         ]]
                     )
                 return "ok"
+            # Reply ma né WA né ID trovati nel messaggio originale → avvisa Lorenzo
+            # (così non cade nella AI sull'owner)
+            invia_messaggio(chat_id,
+                "⚠️ Non riesco a identificare il destinatario di questa risposta.\n\n"
+                "Il messaggio originale a cui hai risposto non contiene un tag `WA:numero` o `ID:numero`.\n\n"
+                "Soluzioni:\n"
+                "• Usa `/rispondi <chat_id> <testo>` per inoltrare manualmente\n"
+                "• Oppure usa il bottone *💬 Prendi chat* sulla notifica fresca dell'ospite",
+                parse_mode="Markdown"
+            )
+            return "ok"
 
         # ── Flusso guidato upload media ──
         if is_owner and str(chat_id) in _upload_media and not testo.startswith("/"):
@@ -2030,6 +2041,12 @@ def webhook():
                 aggiorna_user(chat_id, "telegram", nome, testo, rileva_lingua(testo), username)
             except Exception:
                 pass
+            return "ok"
+
+        # ── GUARD: l'owner non deve mai ricevere risposte AI dal proprio bot ──
+        # Se siamo qui ed è is_owner, qualcosa nei flussi precedenti non ha gestito
+        # correttamente. Non rispondere e basta.
+        if is_owner:
             return "ok"
 
         # ── Risposta AI ─────────────────────────────────────────────────────
