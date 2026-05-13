@@ -270,6 +270,8 @@ Ascensore: di fronte al posto auto, porta grigia
 Come salire all'appartamento dal parcheggio: la porta per salire la trovi di fronte al posto auto
 # Aggiunto il 10/05/2026
 Dove trovo il phon ? Lo trovi in bagno nel mobile sotto il lavandino
+# Aggiunto il 13/05/2026
+Codice lucchetto parcheggio: Il codice del lucchetto del posto auto è 581
 
 [MEDIA]
 keybox, keybox, boite a cle, caja de llaves, schluesselkasten = photo:AgACAgIAAxkBAAIC02n1CRzqGtbDUMFiJRzJNgWch3TsAALNFmsb-gOpS0bdN-CXWrsgAQADAgADeQADOwQ | Qui dove si trova la keybox
