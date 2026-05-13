@@ -274,6 +274,8 @@ Dove trovo il phon ? Lo trovi in bagno nel mobile sotto il lavandino
 Codice lucchetto parcheggio: Il codice del lucchetto del posto auto è 581
 # Aggiunto il 13/05/2026
 Disponibile foto con parole chiave: keybox, locker, casella chiave, casier, boîte à clés, casillero, schließfach — descrizione: La keybox si trova qui
+# Aggiunto il 13/05/2026
+Quale è il parcheggio ?: Il codice del lucchetto che tiene la catenella è 581
 
 [MEDIA]
 keybox, locker, casella chiave, casier, boîte à clés, casillero, schließfach = photo:AgACAgIAAxkBAAIDsmoEwjFcIoyqInpm3HRHZMwDKvolAAJbGWsbapAgSLI7qz6R8yg8AQADAgADeQADOwQ | La keybox si trova qui
