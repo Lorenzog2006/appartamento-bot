@@ -214,6 +214,45 @@ def _salva_users_su_github():
     except Exception:
         pass
 
+# ── Stato wizard /prenotazione (persistente in users.json per sopravvivere ai
+# restart serverless di Vercel) ───────────────────────────────────────────────
+def wizard_pren_get(chat_id):
+    """Legge lo stato del wizard /prenotazione. Ritorna dict o None."""
+    try:
+        _carica_users_da_github()
+        u = _users.get(str(chat_id)) or {}
+        st = u.get("_wizard_pren")
+        return st if isinstance(st, dict) else None
+    except Exception:
+        return None
+
+
+def wizard_pren_set(chat_id, stato):
+    """Salva lo stato del wizard /prenotazione."""
+    try:
+        _carica_users_da_github()
+        cid = str(chat_id)
+        u = _users.setdefault(cid, {})
+        u["_wizard_pren"] = stato
+        _salva_users_su_github()
+        return True
+    except Exception:
+        return False
+
+
+def wizard_pren_clear(chat_id):
+    """Rimuove lo stato del wizard /prenotazione."""
+    try:
+        _carica_users_da_github()
+        u = _users.get(str(chat_id))
+        if u and "_wizard_pren" in u:
+            del u["_wizard_pren"]
+            _salva_users_su_github()
+        return True
+    except Exception:
+        return False
+
+
 def _topic_di(testo):
     """Determina la categoria di una domanda dalle TOPIC_KEYWORDS."""
     t = (testo or "").lower()
@@ -964,33 +1003,89 @@ PROMEMORIA_RECENSIONE = {
     "german":   "Hallo {nome}! 😊 Wir hoffen dein Aufenthalt in Juan les Pins war fantastisch.\n\nWenn du 30 Sekunden hast, eine Bewertung auf Booking oder Airbnb würde uns sehr helfen. ⭐\n\nHerzlichen Dank und bis zum nächsten Urlaub! 🌊",
 }
 
+# Mapping tipo promemoria → nome template Meta approvato
+TIPO_A_TEMPLATE = {
+    "pre_arrivo": "pre_arrivo_v2",
+    "arrivo":     "arrivo_oggi",
+    "check_out":  "check_out_oggi",
+    "recensione": "richiesta_recensione",
+}
+
+
+def _dentro_finestra_24h(chat_id_wa):
+    """True se l'ospite WhatsApp ha scritto al bot nelle ultime 24h
+    (finestra di servizio Meta in cui i messaggi free-form sono gratuiti)."""
+    try:
+        _carica_users_da_github()
+        u = _users.get(str(chat_id_wa))
+        if not u:
+            return False
+        ultimo = (u.get("ultimo_msg", "") or "")[:19]
+        if not ultimo:
+            return False
+        dt_ultimo = datetime.strptime(ultimo, "%Y-%m-%dT%H:%M:%S")
+        return (datetime.now() - dt_ultimo).total_seconds() < 86400
+    except Exception:
+        return False
+
+
 def _invia_a_cliente(chat_id_str, testo, nome_ospite="ospite", tipo_promemoria=""):
-    """Invio promemoria a un cliente.
-    - Telegram (chat_id numerico): invio diretto, automatico
-    - WhatsApp (wa_xxx) o manuale: NON invio direttamente. Invece notifico
-      Lorenzo su Telegram con il testo pronto + link wa.me cliccabile
-      per copia-incolla immediato in WhatsApp.
-    Questo approccio aggira la restrizione finestra-24h di Meta."""
+    """Invio promemoria a un cliente. Logica:
+    - Telegram (chat_id numerico): invio diretto, automatico.
+    - WhatsApp DENTRO finestra 24h: invio diretto via wa_invia() (gratis).
+    - WhatsApp FUORI finestra 24h: invio template Meta approvato (apre la
+      conversazione di servizio). Ricaduta: notifica Lorenzo per copia/incolla.
+    - Canale assente o ramo manuale: notifica Lorenzo come prima."""
     try:
         cid = str(chat_id_str)
         # Telegram: invio automatico
         if cid.isdigit():
             invia_messaggio(int(cid), testo)
             return True
-        # WhatsApp o manuale: notifica Lorenzo per invio manuale
+        # WhatsApp: prova invio automatico (free-form o template)
+        if cid.startswith("wa_"):
+            numero_wa = cid.replace("wa_", "")
+            # 1) Dentro finestra 24h → testo completo gratuito
+            if _dentro_finestra_24h(cid):
+                try:
+                    wa_invia(numero_wa, testo)
+                    if OWNER_ID:
+                        try:
+                            invia_messaggio(
+                                int(OWNER_ID),
+                                f"✅ Promemoria auto-inviato a *{nome_ospite}* via WhatsApp (finestra 24h)",
+                                parse_mode="Markdown"
+                            )
+                        except Exception:
+                            pass
+                    return True
+                except Exception:
+                    pass  # cade su template/manuale
+            # 2) Fuori finestra → template Meta
+            template_name = TIPO_A_TEMPLATE.get(tipo_promemoria)
+            if template_name and wa_invia_template(numero_wa, template_name, nome_ospite):
+                if OWNER_ID:
+                    try:
+                        invia_messaggio(
+                            int(OWNER_ID),
+                            f"✅ Template `{template_name}` inviato a *{nome_ospite}* (+{numero_wa})",
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+                return True
+        # 3) Fallback: notifica Lorenzo per invio manuale (copia/incolla)
         if not OWNER_ID:
             return False
         import urllib.parse as _urlp
-        numero_wa = None
         if cid.startswith("wa_"):
             numero_wa = cid.replace("wa_", "")
             link_wa = f"https://wa.me/{numero_wa}?text={_urlp.quote(testo)}"
-            etichetta_canale = f"📱 WhatsApp: +{numero_wa}"
+            etichetta_canale = f"📱 WhatsApp: +{numero_wa} _(invio auto fallito)_"
             bottoni = [[
                 {"text": "📲 Apri WhatsApp con messaggio precompilato", "url": link_wa}
             ]]
         else:
-            # Prenotazione manuale senza canale
             etichetta_canale = "📝 _Nessun canale impostato — copia manualmente_"
             bottoni = None
         tipo_label = {
@@ -999,7 +1094,6 @@ def _invia_a_cliente(chat_id_str, testo, nome_ospite="ospite", tipo_promemoria="
             "check_out": "🏁 PROMEMORIA CHECK-OUT",
             "recensione": "⭐ RICHIESTA RECENSIONE",
         }.get(tipo_promemoria, "📤 PROMEMORIA")
-        # Messaggio a Lorenzo con testo in blocco code per copia-incolla facile
         msg_a_lorenzo = (
             f"{tipo_label}\n\n"
             f"👤 Ospite: *{nome_ospite}*\n"
@@ -1995,10 +2089,11 @@ def webhook():
             # ── Prenotazione: scelta lingua ──
             elif cb_data.startswith("PREN_LANG:"):
                 lingua_scelta = cb_data.split(":", 1)[1]
-                if str(cb_chat_id) in _attesa_prenotazione:
-                    stato = _attesa_prenotazione[str(cb_chat_id)]
+                stato = wizard_pren_get(cb_chat_id)
+                if stato:
                     stato["lingua"] = lingua_scelta
                     stato["step"] = "contatto"
+                    wizard_pren_set(cb_chat_id, stato)
                     modifica_messaggio(cb_chat_id, cb_msg_id,
                         cb_testo + f"\n\n✅ Lingua: *{lingua_scelta}*", parse_mode="Markdown", bottoni=[])
                     invia_messaggio(cb_chat_id,
@@ -2274,7 +2369,13 @@ def webhook():
             return "ok"
 
         # ── Proprietario scrive info direttamente → chiede se salvare ──
-        if is_owner and not message.get("reply_to_message") and not testo.startswith("/"):
+        # Skippa se il proprietario è in mezzo a un wizard (prenotazione/upload/correzione date)
+        if (is_owner
+                and not message.get("reply_to_message")
+                and not testo.startswith("/")
+                and not wizard_pren_get(chat_id)
+                and str(chat_id) not in _upload_media
+                and str(chat_id) not in _attesa_correzione_owner):
             invia_bottoni(chat_id,
                 f"💾 Vuoi aggiungere questa info ad appartamento.txt?\n\nR: {testo}",
                 [[
@@ -2324,7 +2425,7 @@ def webhook():
 
         # ── /prenotazione ── wizard per aggiungere prenotazione manualmente ──
         if testo == "/prenotazione" and is_owner:
-            _attesa_prenotazione[str(chat_id)] = {"step": "nome"}
+            wizard_pren_set(chat_id, {"step": "nome"})
             invia_messaggio(chat_id,
                 "📅 *Nuova prenotazione* — passo 1/4\n\n"
                 "Come si chiama l'ospite?\n\n"
@@ -2333,17 +2434,19 @@ def webhook():
             )
             return "ok"
 
-        if testo == "/annulla" and is_owner and str(chat_id) in _attesa_prenotazione:
-            _attesa_prenotazione.pop(str(chat_id), None)
+        if testo == "/annulla" and is_owner and wizard_pren_get(chat_id):
+            wizard_pren_clear(chat_id)
             invia_messaggio(chat_id, "❌ Prenotazione annullata.")
             return "ok"
 
         # ── Flusso prenotazione manuale ──
-        if is_owner and str(chat_id) in _attesa_prenotazione and not testo.startswith("/"):
-            stato = _attesa_prenotazione[str(chat_id)]
+        stato_pren = wizard_pren_get(chat_id) if is_owner else None
+        if stato_pren and not testo.startswith("/"):
+            stato = stato_pren
             if stato["step"] == "nome":
                 stato["nome"] = testo.strip()
                 stato["step"] = "date"
+                wizard_pren_set(chat_id, stato)
                 invia_messaggio(chat_id,
                     f"✅ Ospite: *{stato['nome']}*\n\n"
                     f"📅 *Passo 2/4* — Date di check-in e check-out\n\n"
@@ -2365,6 +2468,7 @@ def webhook():
                 stato["checkin"] = ci
                 stato["checkout"] = co
                 stato["step"] = "lingua"
+                wizard_pren_set(chat_id, stato)
                 invia_bottoni(chat_id,
                     f"✅ Check-in: {ci}\n✅ Check-out: {co}\n\n"
                     f"📅 *Passo 3/4* — Lingua dell'ospite",
@@ -2409,7 +2513,7 @@ def webhook():
                     )
                     return "ok"
                 ok = salva_prenotazione(chat_id_finale, stato["nome"], stato["checkin"], stato["checkout"], stato["lingua"])
-                _attesa_prenotazione.pop(str(chat_id), None)
+                wizard_pren_clear(chat_id)
                 if ok:
                     if canale:
                         riga_canale = f"📱 *{canale.title()}*: `{chat_id_finale}`\n\n✅ Da domani il bot manderà automaticamente i promemoria a questo ospite."
@@ -3899,6 +4003,42 @@ def wa_invia(to, testo):
             })
         except Exception:
             pass
+
+
+def wa_invia_template(to, template_name, nome_ospite, lingua_code="it"):
+    """Invia un template WhatsApp approvato da Meta. Ritorna True se 200 OK.
+    nome_ospite va nel componente body come variabile named `nome_ospite`."""
+    try:
+        url = f"https://graph.facebook.com/v18.0/{WA_PHONE_ID}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": lingua_code},
+                "components": [{
+                    "type": "body",
+                    "parameters": [{
+                        "type": "text",
+                        "parameter_name": "nome_ospite",
+                        "text": (nome_ospite or "ospite")
+                    }]
+                }]
+            }
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {WA_TOKEN}"
+        })
+        urllib.request.urlopen(req, timeout=10)
+        return True
+    except Exception as e:
+        try:
+            log_errore(f"wa_template_{template_name}", e)
+        except Exception:
+            pass
+        return False
 
 
 # Cache: telegram_file_id → wa_media_id (validi per molte ore lato Meta)
