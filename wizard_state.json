@@ -1,6 +1,8 @@
 {
   "20516342": {
-    "step": "date",
-    "nome": "Lorenzo"
+    "step": "lingua",
+    "nome": "Lorenzo",
+    "checkin": "16/05/2026",
+    "checkout": "17/05/2026"
   }
 }
