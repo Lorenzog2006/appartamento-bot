@@ -2479,11 +2479,14 @@ def webhook():
 
         # ── /prenotazione ── wizard per aggiungere prenotazione manualmente ──
         if testo == "/prenotazione" and is_owner:
-            wizard_pren_set(chat_id, {"step": "nome"})
+            ok_save = wizard_pren_set(chat_id, {"step": "nome"})
+            # DEBUG: verifica subito che il save sia visibile
+            verify = wizard_pren_get(chat_id)
             invia_messaggio(chat_id,
-                "📅 *Nuova prenotazione* — passo 1/4\n\n"
-                "Come si chiama l'ospite?\n\n"
-                "_(scrivi /annulla per annullare in qualsiasi momento)_",
+                f"📅 *Nuova prenotazione v2* — passo 1/4\n\n"
+                f"Come si chiama l'ospite?\n\n"
+                f"_DEBUG: save_ok={ok_save}, get_back={verify}_\n"
+                f"_(scrivi /annulla per annullare in qualsiasi momento)_",
                 parse_mode="Markdown"
             )
             return "ok"
