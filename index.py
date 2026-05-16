@@ -186,33 +186,49 @@ def _carica_users_da_github():
         _users_loaded = True
 
 def _salva_users_su_github():
+    """Salva _users su GitHub. Su conflitto SHA (409/422) refetch dello SHA
+    e ritenta il PUT con i dati in memoria (last-write-wins, accettabile per
+    questo bot a basso traffico)."""
     global _users_sha
     if not GITHUB_TOKEN:
         return
-    try:
-        contenuto_nuovo = json.dumps(_users, ensure_ascii=False, indent=2)
-        payload = {
-            "message": "Aggiorna anagrafica utenti",
-            "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
-        }
-        if _users_sha:
-            payload["sha"] = _users_sha
-        req = urllib.request.Request(USERS_API, data=json.dumps(payload).encode(), headers={
-            "Authorization": f"token {GITHUB_TOKEN}",
-            "Content-Type": "application/json",
-            "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "appartamento-bot"
-        }, method="PUT")
-        r = urllib.request.urlopen(req, timeout=8)
-        risposta = json.loads(r.read())
-        _users_sha = risposta.get("content", {}).get("sha", _users_sha)
-    except urllib.error.HTTPError as e:
-        if e.code in (409, 422):
-            global _users_loaded
-            _users_loaded = False
-            _carica_users_da_github()
-    except Exception:
-        pass
+    for _attempt in range(3):
+        try:
+            contenuto_nuovo = json.dumps(_users, ensure_ascii=False, indent=2)
+            payload = {
+                "message": "Aggiorna anagrafica utenti",
+                "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+            }
+            if _users_sha:
+                payload["sha"] = _users_sha
+            req = urllib.request.Request(USERS_API, data=json.dumps(payload).encode(), headers={
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "appartamento-bot"
+            }, method="PUT")
+            r = urllib.request.urlopen(req, timeout=8)
+            risposta = json.loads(r.read())
+            _users_sha = risposta.get("content", {}).get("sha", _users_sha)
+            return
+        except urllib.error.HTTPError as e:
+            if e.code in (409, 422):
+                # Refetch solo dello SHA (NON sovrascrivere _users in memoria) e ritenta
+                try:
+                    url = f"{USERS_API}?t={int(datetime.now().timestamp())}"
+                    rg = urllib.request.urlopen(urllib.request.Request(url, headers={
+                        "Authorization": f"token {GITHUB_TOKEN}",
+                        "Accept": "application/vnd.github.v3+json",
+                        "User-Agent": "appartamento-bot"
+                    }), timeout=4)
+                    data = json.loads(rg.read())
+                    _users_sha = data["sha"]
+                except Exception:
+                    return
+                continue
+            return
+        except Exception:
+            return
 
 # ── Stato wizard /prenotazione (persistente in users.json per sopravvivere ai
 # restart serverless di Vercel) ───────────────────────────────────────────────
