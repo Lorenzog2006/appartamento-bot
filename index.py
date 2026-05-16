@@ -186,84 +186,122 @@ def _carica_users_da_github():
         _users_loaded = True
 
 def _salva_users_su_github():
-    """Salva _users su GitHub. Su conflitto SHA (409/422) refetch dello SHA
-    e ritenta il PUT con i dati in memoria (last-write-wins, accettabile per
-    questo bot a basso traffico)."""
     global _users_sha
     if not GITHUB_TOKEN:
         return
-    for _attempt in range(3):
+    try:
+        contenuto_nuovo = json.dumps(_users, ensure_ascii=False, indent=2)
+        payload = {
+            "message": "Aggiorna anagrafica utenti",
+            "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+        }
+        if _users_sha:
+            payload["sha"] = _users_sha
+        req = urllib.request.Request(USERS_API, data=json.dumps(payload).encode(), headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        }, method="PUT")
+        r = urllib.request.urlopen(req, timeout=8)
+        risposta = json.loads(r.read())
+        _users_sha = risposta.get("content", {}).get("sha", _users_sha)
+    except urllib.error.HTTPError as e:
+        if e.code in (409, 422):
+            global _users_loaded
+            _users_loaded = False
+            _carica_users_da_github()
+    except Exception:
+        pass
+
+# ── Stato wizard /prenotazione (file dedicato wizard_state.json su GitHub:
+# solo l'owner ci scrive → zero race con altre richieste) ─────────────────────
+WIZARD_API = f"https://api.github.com/repos/{REPO}/contents/wizard_state.json"
+
+def _wizard_load_raw():
+    """Ritorna (dict_stato, sha) leggendo wizard_state.json da GitHub.
+    Se il file non esiste ritorna ({}, None). Non usa cache: legge sempre fresco
+    per minimizzare conflitti (il wizard dura ~30s, non vale la pena cachare)."""
+    if not GITHUB_TOKEN:
+        return ({}, None)
+    try:
+        url = f"{WIZARD_API}?t={int(datetime.now().timestamp())}"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=4)
+        data = json.loads(r.read())
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        stato = json.loads(contenuto) if contenuto.strip() else {}
+        return (stato, data["sha"])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return ({}, None)
+        return ({}, None)
+    except Exception:
+        return ({}, None)
+
+
+def _wizard_save_raw(stato_completo, sha):
+    """PUT wizard_state.json. Su conflitto refetch sha e ritenta una volta."""
+    if not GITHUB_TOKEN:
+        return False
+    for _attempt in range(2):
         try:
-            contenuto_nuovo = json.dumps(_users, ensure_ascii=False, indent=2)
             payload = {
-                "message": "Aggiorna anagrafica utenti",
-                "content": base64.b64encode(contenuto_nuovo.encode("utf-8")).decode("utf-8"),
+                "message": "Bot aggiorna wizard state",
+                "content": base64.b64encode(json.dumps(stato_completo, ensure_ascii=False, indent=2).encode("utf-8")).decode("utf-8"),
             }
-            if _users_sha:
-                payload["sha"] = _users_sha
-            req = urllib.request.Request(USERS_API, data=json.dumps(payload).encode(), headers={
+            if sha:
+                payload["sha"] = sha
+            req = urllib.request.Request(WIZARD_API, data=json.dumps(payload).encode(), headers={
                 "Authorization": f"token {GITHUB_TOKEN}",
                 "Content-Type": "application/json",
                 "Accept": "application/vnd.github.v3+json",
                 "User-Agent": "appartamento-bot"
             }, method="PUT")
-            r = urllib.request.urlopen(req, timeout=8)
-            risposta = json.loads(r.read())
-            _users_sha = risposta.get("content", {}).get("sha", _users_sha)
-            return
+            urllib.request.urlopen(req, timeout=8)
+            return True
         except urllib.error.HTTPError as e:
             if e.code in (409, 422):
-                # Refetch solo dello SHA (NON sovrascrivere _users in memoria) e ritenta
-                try:
-                    url = f"{USERS_API}?t={int(datetime.now().timestamp())}"
-                    rg = urllib.request.urlopen(urllib.request.Request(url, headers={
-                        "Authorization": f"token {GITHUB_TOKEN}",
-                        "Accept": "application/vnd.github.v3+json",
-                        "User-Agent": "appartamento-bot"
-                    }), timeout=4)
-                    data = json.loads(rg.read())
-                    _users_sha = data["sha"]
-                except Exception:
-                    return
+                _, sha = _wizard_load_raw()
                 continue
-            return
+            return False
         except Exception:
-            return
+            return False
+    return False
 
-# ── Stato wizard /prenotazione (persistente in users.json per sopravvivere ai
-# restart serverless di Vercel) ───────────────────────────────────────────────
+
 def wizard_pren_get(chat_id):
-    """Legge lo stato del wizard /prenotazione. Ritorna dict o None."""
+    """Legge lo stato del wizard /prenotazione per chat_id. Ritorna dict o None."""
     try:
-        _carica_users_da_github()
-        u = _users.get(str(chat_id)) or {}
-        st = u.get("_wizard_pren")
+        stato, _ = _wizard_load_raw()
+        st = stato.get(str(chat_id))
         return st if isinstance(st, dict) else None
     except Exception:
         return None
 
 
-def wizard_pren_set(chat_id, stato):
-    """Salva lo stato del wizard /prenotazione."""
+def wizard_pren_set(chat_id, stato_wizard):
+    """Salva lo stato del wizard /prenotazione per chat_id."""
     try:
-        _carica_users_da_github()
-        cid = str(chat_id)
-        u = _users.setdefault(cid, {})
-        u["_wizard_pren"] = stato
-        _salva_users_su_github()
-        return True
+        completo, sha = _wizard_load_raw()
+        completo[str(chat_id)] = stato_wizard
+        return _wizard_save_raw(completo, sha)
     except Exception:
         return False
 
 
 def wizard_pren_clear(chat_id):
-    """Rimuove lo stato del wizard /prenotazione."""
+    """Rimuove lo stato del wizard /prenotazione per chat_id."""
     try:
-        _carica_users_da_github()
-        u = _users.get(str(chat_id))
-        if u and "_wizard_pren" in u:
-            del u["_wizard_pren"]
-            _salva_users_su_github()
+        completo, sha = _wizard_load_raw()
+        cid = str(chat_id)
+        if cid in completo:
+            del completo[cid]
+            return _wizard_save_raw(completo, sha)
         return True
     except Exception:
         return False
