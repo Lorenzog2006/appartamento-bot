@@ -2422,6 +2422,21 @@ def webhook():
                 )
             return "ok"
 
+        # ── Channel manager: proprietario sta completando una prenotazione iCal ──
+        # Precedenza: prima di interpretare il testo come "info da salvare in appartamento.txt".
+        # I controlli `not wizard_pren_get(...)` e `_attesa_correzione_owner` garantiscono
+        # che i wizard ospiti esistenti hanno la priorità.
+        if (is_owner
+                and not message.get("reply_to_message")
+                and not testo.startswith("/")
+                and not wizard_pren_get(chat_id)
+                and str(chat_id) not in _upload_media
+                and str(chat_id) not in _attesa_correzione_owner
+                and cal_has_pending()):
+            risposta_cal = cal_complete_oldest_stub(testo)
+            invia_messaggio(chat_id, risposta_cal, parse_mode="Markdown")
+            return "ok"
+
         # ── Proprietario scrive info direttamente → chiede se salvare ──
         # Skippa se il proprietario è in mezzo a un wizard (prenotazione/upload/correzione date)
         if (is_owner
@@ -2476,6 +2491,34 @@ def webhook():
             else:
                 invia_messaggio(chat_id, f"❌ Errore")
             return "ok"
+
+        # ── /cal ── channel manager: lista stub in attesa di completamento ──
+        if testo.startswith("/cal") and is_owner:
+            parti = testo.split(maxsplit=1)
+            sub = parti[0]
+            if sub == "/cal":
+                invia_messaggio(chat_id, cal_format_pending_list(), parse_mode="Markdown")
+                return "ok"
+            if sub == "/calsync":
+                # Trigger manuale del sync iCal (riusa la stessa logica del cron).
+                try:
+                    resp = cron_sync_ical()
+                    # cron_sync_ical ritorna json.dumps(dict) o tuple (body, code, headers)
+                    body = resp[0] if isinstance(resp, tuple) else resp
+                    risultato = json.loads(body) if isinstance(body, str) else body
+                    if "error" in risultato:
+                        invia_messaggio(chat_id, f"❌ Errore sync: {risultato['error']}")
+                    else:
+                        a = risultato.get("airbnb", {})
+                        b = risultato.get("booking", {})
+                        invia_messaggio(chat_id,
+                            f"🔄 Sync iCal completato:\n"
+                            f"• Airbnb: {a.get('fetched',0)} eventi, {a.get('new',0)} nuovi, {a.get('seeded',0)} seed\n"
+                            f"• Booking: {b.get('fetched',0)} eventi, {b.get('new',0)} nuovi, {b.get('seeded',0)} seed"
+                        )
+                except Exception as e:
+                    invia_messaggio(chat_id, f"❌ Errore sync: {e}")
+                return "ok"
 
         # ── /prenotazione ── wizard per aggiungere prenotazione manualmente ──
         if testo == "/prenotazione" and is_owner:
@@ -4376,3 +4419,517 @@ def whatsapp_webhook():
         pass
 
     return "ok"
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# CHANNEL MANAGER — Modulo isolato per sincronizzazione iCal Airbnb + Booking
+#
+# Questo modulo è completamente indipendente dal flusso messaggi-ospiti:
+# - Usa file propri: calendar_events.json, calendar_wizard_state.json
+# - Non scrive su bookings.json (gestito dal wizard /prenotazione)
+# - Non manda messaggi automatici agli ospiti (solo notifiche al proprietario)
+# - Cancellando questo blocco, il bot ospiti continua a funzionare uguale.
+#
+# Vedi PIANO.md per l'architettura completa.
+# ════════════════════════════════════════════════════════════════════════════════
+
+AIRBNB_ICAL_URL  = (os.environ.get("AIRBNB_ICAL_URL")  or "").strip()
+BOOKING_ICAL_URL = (os.environ.get("BOOKING_ICAL_URL") or "").strip()
+
+CAL_EVENTS_API = f"https://api.github.com/repos/{REPO}/contents/calendar_events.json"
+CAL_WIZARD_API = f"https://api.github.com/repos/{REPO}/contents/calendar_wizard_state.json"
+
+
+def _cal_load_events():
+    """Ritorna (dict_eventi, sha) da calendar_events.json su GitHub. ({}, None) se assente."""
+    if not GITHUB_TOKEN:
+        return ({}, None)
+    try:
+        url = f"{CAL_EVENTS_API}?t={int(datetime.now().timestamp())}"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=5)
+        data = json.loads(r.read())
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        eventi = json.loads(contenuto) if contenuto.strip() else {}
+        return (eventi, data["sha"])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return ({}, None)
+        return ({}, None)
+    except Exception:
+        return ({}, None)
+
+
+def _cal_save_events(eventi, sha):
+    """PUT calendar_events.json. Retry una volta su conflitto SHA."""
+    if not GITHUB_TOKEN:
+        return False
+    for _attempt in range(2):
+        try:
+            payload = {
+                "message": "Channel manager: aggiorna eventi calendario",
+                "content": base64.b64encode(json.dumps(eventi, ensure_ascii=False, indent=2).encode("utf-8")).decode("utf-8"),
+            }
+            if sha:
+                payload["sha"] = sha
+            req = urllib.request.Request(CAL_EVENTS_API, data=json.dumps(payload).encode(), headers={
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "appartamento-bot"
+            }, method="PUT")
+            urllib.request.urlopen(req, timeout=10)
+            return True
+        except urllib.error.HTTPError as e:
+            if e.code in (409, 422):
+                _, sha = _cal_load_events()
+                continue
+            return False
+        except Exception:
+            return False
+    return False
+
+
+def _cal_load_wizard_state():
+    """Ritorna (dict_stato, sha). Lo stato ha forma {'pending_completions': [chiave, ...]}."""
+    if not GITHUB_TOKEN:
+        return ({"pending_completions": []}, None)
+    try:
+        url = f"{CAL_WIZARD_API}?t={int(datetime.now().timestamp())}"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=4)
+        data = json.loads(r.read())
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        stato = json.loads(contenuto) if contenuto.strip() else {}
+        if "pending_completions" not in stato or not isinstance(stato["pending_completions"], list):
+            stato["pending_completions"] = []
+        return (stato, data["sha"])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return ({"pending_completions": []}, None)
+        return ({"pending_completions": []}, None)
+    except Exception:
+        return ({"pending_completions": []}, None)
+
+
+def _cal_save_wizard_state(stato, sha):
+    """PUT calendar_wizard_state.json con retry su conflitto."""
+    if not GITHUB_TOKEN:
+        return False
+    for _attempt in range(2):
+        try:
+            payload = {
+                "message": "Channel manager: aggiorna wizard state",
+                "content": base64.b64encode(json.dumps(stato, ensure_ascii=False, indent=2).encode("utf-8")).decode("utf-8"),
+            }
+            if sha:
+                payload["sha"] = sha
+            req = urllib.request.Request(CAL_WIZARD_API, data=json.dumps(payload).encode(), headers={
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "appartamento-bot"
+            }, method="PUT")
+            urllib.request.urlopen(req, timeout=10)
+            return True
+        except urllib.error.HTTPError as e:
+            if e.code in (409, 422):
+                _, sha = _cal_load_wizard_state()
+                continue
+            return False
+        except Exception:
+            return False
+    return False
+
+
+def cal_has_pending():
+    """True se c'è almeno uno stub calendario in attesa di completamento."""
+    try:
+        stato, _ = _cal_load_wizard_state()
+        return bool(stato.get("pending_completions"))
+    except Exception:
+        return False
+
+
+def _cal_parse_ical(testo, channel):
+    """Parsa un feed iCalendar e ritorna lista di eventi normalizzati.
+    Non usa librerie esterne: estrae blocchi VEVENT con regex.
+
+    Filtri specifici per canale:
+    - Airbnb: solo SUMMARY="Reserved" (i blocchi manuali appaiono come "Not available"
+      o "Airbnb (Not available)" e vanno ignorati).
+    - Booking: tutti gli eventi (il loro iCal mostra sempre "CLOSED - Not available"
+      sia per prenotazioni sia per blocchi manuali, non c'è modo di distinguerli).
+    """
+    eventi = []
+    blocchi = re.findall(r"BEGIN:VEVENT(.*?)END:VEVENT", testo, re.DOTALL)
+    for blocco in blocchi:
+        # Unfold delle righe continue (RFC 5545: una riga che inizia con spazio/tab
+        # è la continuazione della precedente)
+        unfolded = re.sub(r"\r?\n[ \t]", "", blocco)
+        def _campo(nome):
+            m = re.search(rf"^{nome}(?:;[^:]*)?:(.*?)$", unfolded, re.MULTILINE)
+            return m.group(1).strip() if m else None
+        uid = _campo("UID")
+        dtstart = _campo("DTSTART")
+        dtend = _campo("DTEND")
+        summary = _campo("SUMMARY") or ""
+        if not (uid and dtstart and dtend):
+            continue
+        # Filtro Airbnb: scarta i blocchi manuali. Le prenotazioni vere hanno
+        # SUMMARY esatto "Reserved"; i blocchi hanno "Not available" o varianti.
+        if channel == "airbnb":
+            sl = summary.lower()
+            if "not available" in sl or "blocked" in sl:
+                continue
+        # DTSTART/DTEND formato YYYYMMDD (date-only) — Airbnb e Booking usano questo
+        m_in = re.match(r"(\d{4})(\d{2})(\d{2})", dtstart)
+        m_out = re.match(r"(\d{4})(\d{2})(\d{2})", dtend)
+        if not (m_in and m_out):
+            continue
+        checkin = f"{m_in.group(3)}/{m_in.group(2)}/{m_in.group(1)}"
+        checkout = f"{m_out.group(3)}/{m_out.group(2)}/{m_out.group(1)}"
+        # Codice prenotazione: Airbnb mette nel SUMMARY o nella DESCRIPTION
+        # un URL tipo /details/HMABCD1234. In fallback usiamo i primi 10 char di UID.
+        code = None
+        m_code = re.search(r"/details/([A-Z0-9]+)", unfolded)
+        if m_code:
+            code = m_code.group(1)
+        else:
+            m_code = re.search(r"\b([A-Z0-9]{8,12})\b", summary)
+            if m_code:
+                code = m_code.group(1)
+        if not code:
+            code = uid.split("@")[0][:12] if "@" in uid else uid[:12]
+        eventi.append({
+            "uid": uid,
+            "checkin": checkin,
+            "checkout": checkout,
+            "summary": summary,
+            "code": code,
+            "channel": channel,
+        })
+    return eventi
+
+
+def cal_fetch_ical_events(url, channel):
+    """Scarica un feed iCal pubblico e ritorna la lista di eventi parsati."""
+    if not url:
+        return []
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "appartamento-bot"})
+        r = urllib.request.urlopen(req, timeout=10)
+        body = r.read().decode("utf-8", errors="ignore")
+        return _cal_parse_ical(body, channel)
+    except Exception as e:
+        try:
+            log_errore(f"cal_fetch_{channel}", e)
+        except Exception:
+            pass
+        return []
+
+
+def _cal_count_notti(checkin, checkout):
+    """Calcola numero notti tra due date DD/MM/YYYY. 0 se errore."""
+    try:
+        ci = datetime.strptime(checkin, "%d/%m/%Y")
+        co = datetime.strptime(checkout, "%d/%m/%Y")
+        return max(0, (co - ci).days)
+    except Exception:
+        return 0
+
+
+def cal_extract_details_from_freetext(testo):
+    """Usa Groq per estrarre {nome, num_ospiti, prezzo_eur} da una risposta libera del proprietario.
+    Tollera formati diversi: 'Mario Rossi / 3 / 720', 'Mario 3 ospiti 720€', ecc.
+    Ritorna dict con i tre campi o None se l'estrazione fallisce."""
+    if not GROQ_KEY:
+        return None
+    prompt = (
+        "Estrai SOLO un oggetto JSON con i campi nome (string), num_ospiti (int), "
+        "prezzo_eur (number). Niente testo prima o dopo, solo JSON. "
+        "Se un campo non è presente nel testo, ometti la chiave.\n\n"
+        f"Testo: {testo.strip()}"
+    )
+    try:
+        risposta = _chiama_groq(
+            "llama-3.1-8b-instant",
+            [
+                {"role": "system", "content": "Sei un parser. Output solo JSON valido."},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=8,
+        )
+        cleaned = re.sub(r"^```(?:json)?|```$", "", risposta.strip(), flags=re.MULTILINE).strip()
+        m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if not m:
+            return None
+        dati = json.loads(m.group(0))
+        nome = (dati.get("nome") or "").strip()
+        try:
+            num_ospiti = int(dati.get("num_ospiti") or 0)
+        except Exception:
+            num_ospiti = 0
+        try:
+            prezzo_eur = float(str(dati.get("prezzo_eur") or 0).replace(",", "."))
+        except Exception:
+            prezzo_eur = 0.0
+        if not nome and num_ospiti == 0 and prezzo_eur == 0:
+            return None
+        return {"nome": nome, "num_ospiti": num_ospiti, "prezzo_eur": prezzo_eur}
+    except Exception as e:
+        try:
+            log_errore("cal_extract", e)
+        except Exception:
+            pass
+        return None
+
+
+def cal_complete_oldest_stub(testo_risposta):
+    """Completa il primo stub in coda con i dati estratti da testo_risposta.
+    Ritorna stringa di conferma da mandare al proprietario."""
+    stato, sha_w = _cal_load_wizard_state()
+    pending = stato.get("pending_completions") or []
+    if not pending:
+        return "⚠️ Nessuno stub calendario in attesa."
+    eventi, sha_e = _cal_load_events()
+    key = pending[0]
+    ev = eventi.get(key)
+    if not ev:
+        # Stub orfano: rimuovi dalla coda
+        stato["pending_completions"] = pending[1:]
+        _cal_save_wizard_state(stato, sha_w)
+        return "⚠️ Stub non trovato (forse cancellato). Coda ripulita."
+    dati = cal_extract_details_from_freetext(testo_risposta)
+    if not dati:
+        return (
+            "❌ Non sono riuscito a interpretare la risposta.\n\n"
+            "Riprova con un formato tipo: `Mario Rossi / 3 / 720`\n"
+            "oppure: `nome Mario Rossi, 3 ospiti, 720 euro`"
+        )
+    ev["nome"] = dati["nome"] or ev.get("nome", "")
+    ev["num_ospiti"] = dati["num_ospiti"] or ev.get("num_ospiti", 0)
+    ev["prezzo_eur"] = dati["prezzo_eur"] or ev.get("prezzo_eur", 0.0)
+    ev["stato"] = "complete"
+    ev["completed_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    eventi[key] = ev
+    ok_ev = _cal_save_events(eventi, sha_e)
+    stato["pending_completions"] = pending[1:]
+    ok_w = _cal_save_wizard_state(stato, sha_w)
+    if not (ok_ev and ok_w):
+        return "⚠️ Errore nel salvataggio su GitHub. Riprova fra qualche secondo."
+    notti = _cal_count_notti(ev["checkin"], ev["checkout"])
+    riga_rim = ""
+    if stato["pending_completions"]:
+        riga_rim = f"\n\nℹ️ Restano {len(stato['pending_completions'])} prenotazion{'e' if len(stato['pending_completions']) == 1 else 'i'} da completare."
+    return (
+        f"✅ *Evento calendario salvato*\n\n"
+        f"🏷️ Canale: {ev.get('canale','?').title()}\n"
+        f"👤 {ev['nome']} ({ev['num_ospiti']} ospit{'e' if ev['num_ospiti']==1 else 'i'})\n"
+        f"📅 {ev['checkin']} → {ev['checkout']} ({notti} nott{'e' if notti==1 else 'i'})\n"
+        f"💶 {ev['prezzo_eur']:.0f} €\n"
+        f"🔖 Cod. {ev.get('code','?')}"
+        f"{riga_rim}"
+    )
+
+
+def cal_format_pending_list():
+    """Ritorna un messaggio markdown con la lista degli stub pending."""
+    stato, _ = _cal_load_wizard_state()
+    pending = stato.get("pending_completions") or []
+    if not pending:
+        return "📭 Nessuna prenotazione in attesa di completamento.\n\nQuando arriva una prenotazione su Airbnb o Booking, ti scrivo qui."
+    eventi, _ = _cal_load_events()
+    righe = ["📋 *Prenotazioni in attesa di dettagli*\n"]
+    for i, key in enumerate(pending, 1):
+        ev = eventi.get(key)
+        if not ev:
+            continue
+        righe.append(
+            f"{i}. *{ev.get('canale','?').title()}* — {ev['checkin']} → {ev['checkout']}\n"
+            f"   🔖 Cod. {ev.get('code','?')}"
+        )
+    righe.append("\nRispondi con i dati della *prima* prenotazione nel formato:\n`nome / ospiti / prezzo`\nEs: `Mario Rossi / 3 / 720`")
+    return "\n".join(righe)
+
+
+def _cal_notify_owner_new_stub(ev):
+    """Notifica il proprietario di una nuova prenotazione rilevata."""
+    if not OWNER_ID:
+        return
+    notti = _cal_count_notti(ev["checkin"], ev["checkout"])
+    msg = (
+        f"🆕 *Nuova prenotazione {ev.get('channel','?').title()}*\n\n"
+        f"📅 {ev['checkin']} → {ev['checkout']} ({notti} nott{'e' if notti==1 else 'i'})\n"
+        f"🔖 Cod. {ev.get('code','?')}\n\n"
+        f"Rispondimi con: `nome / ospiti / prezzo`\n"
+        f"Es: `Mario Rossi / 3 / 720`"
+    )
+    try:
+        invia_messaggio(int(OWNER_ID), msg, parse_mode="Markdown")
+    except Exception:
+        pass
+
+
+@app.route("/cron/sync-ical", methods=["GET", "POST"])
+def cron_sync_ical():
+    """Polling dei feed iCal Airbnb/Booking. Per ogni nuovo UID crea uno stub
+    in calendar_events.json e mette il proprietario in attesa di completamento.
+    Idempotente: UID già visti vengono ignorati.
+
+    Primo sync (seed): se calendar_events.json è vuoto, gli eventi esistenti
+    vengono salvati con stato 'seeded' SENZA mandare notifica Telegram né
+    aggiungerli alla coda di completamento. Solo i nuovi eventi visti dopo
+    il seed iniziale generano notifiche."""
+    risultato = {"airbnb": {"fetched": 0, "new": 0, "seeded": 0}, "booking": {"fetched": 0, "new": 0, "seeded": 0}}
+    try:
+        eventi_esistenti, sha_e = _cal_load_events()
+        stato, sha_w = _cal_load_wizard_state()
+        pending = stato.get("pending_completions") or []
+        is_first_sync = not eventi_esistenti
+        modificato = False
+        for url, channel in ((AIRBNB_ICAL_URL, "airbnb"), (BOOKING_ICAL_URL, "booking")):
+            if not url:
+                continue
+            lista = cal_fetch_ical_events(url, channel)
+            risultato[channel]["fetched"] = len(lista)
+            for ev in lista:
+                # Chiave canonica: <canale>_<code>. Garantisce idempotenza.
+                key = f"{channel}_{ev['code']}"
+                if key in eventi_esistenti:
+                    continue
+                if is_first_sync:
+                    # Seed silenzioso: salva ma non notifica e non chiede dettagli.
+                    eventi_esistenti[key] = {
+                        "canale": channel,
+                        "code": ev["code"],
+                        "checkin": ev["checkin"],
+                        "checkout": ev["checkout"],
+                        "stato": "seeded",
+                        "nome": "",
+                        "num_ospiti": 0,
+                        "prezzo_eur": 0.0,
+                        "ical_uid": ev["uid"],
+                        "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                    }
+                    risultato[channel]["seeded"] += 1
+                else:
+                    eventi_esistenti[key] = {
+                        "canale": channel,
+                        "code": ev["code"],
+                        "checkin": ev["checkin"],
+                        "checkout": ev["checkout"],
+                        "stato": "pending_details",
+                        "nome": "",
+                        "num_ospiti": 0,
+                        "prezzo_eur": 0.0,
+                        "ical_uid": ev["uid"],
+                        "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                    }
+                    if key not in pending:
+                        pending.append(key)
+                    risultato[channel]["new"] += 1
+                    _cal_notify_owner_new_stub({
+                        "channel": channel, "code": ev["code"],
+                        "checkin": ev["checkin"], "checkout": ev["checkout"],
+                    })
+                modificato = True
+        if modificato:
+            _cal_save_events(eventi_esistenti, sha_e)
+            stato["pending_completions"] = pending
+            _cal_save_wizard_state(stato, sha_w)
+            # Notifica una volta al proprietario il completamento del seed iniziale
+            if is_first_sync and OWNER_ID:
+                try:
+                    tot_seed = risultato["airbnb"]["seeded"] + risultato["booking"]["seeded"]
+                    invia_messaggio(int(OWNER_ID),
+                        f"✅ Channel manager attivato.\n\n"
+                        f"Ho importato silenziosamente {tot_seed} eventi già presenti sui tuoi calendari "
+                        f"(Airbnb: {risultato['airbnb']['seeded']}, Booking: {risultato['booking']['seeded']}).\n\n"
+                        f"D'ora in poi ti avviso solo quando arriva una *nuova* prenotazione.",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+    except Exception as e:
+        try:
+            log_errore("cron_sync_ical", e)
+        except Exception:
+            pass
+        return (json.dumps({"error": str(e)}), 500, {"Content-Type": "application/json"})
+    return json.dumps(risultato)
+
+
+def _cal_ics_escape(testo):
+    """Escape minimo dei caratteri speciali iCalendar (RFC 5545 §3.3.11)."""
+    if not testo:
+        return ""
+    return (testo.replace("\\", "\\\\")
+                 .replace(";", "\\;")
+                 .replace(",", "\\,")
+                 .replace("\n", "\\n"))
+
+
+@app.route("/calendar.ics", methods=["GET"])
+def calendar_ics():
+    """Feed iCalendar pubblico con tutti gli eventi di calendar_events.json.
+    Sottoscrivibile da Google Calendar / Apple Calendar."""
+    eventi, _ = _cal_load_events()
+    righe = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Appartamento Juan les Pins//Channel Manager//IT",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "X-WR-CALNAME:Prenotazioni Juan les Pins",
+        "X-WR-TIMEZONE:Europe/Paris",
+    ]
+    now_stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    for key, ev in (eventi or {}).items():
+        try:
+            ci = datetime.strptime(ev["checkin"], "%d/%m/%Y").strftime("%Y%m%d")
+            co = datetime.strptime(ev["checkout"], "%d/%m/%Y").strftime("%Y%m%d")
+        except Exception:
+            continue
+        canale = (ev.get("canale") or "?").title()
+        nome = ev.get("nome") or ""
+        num_ospiti = ev.get("num_ospiti") or 0
+        prezzo = ev.get("prezzo_eur") or 0.0
+        if ev.get("stato") == "complete" and nome:
+            summary = f"[{canale}] {nome} — {num_ospiti} ospiti — {prezzo:.0f}€"
+        else:
+            summary = f"[{canale}] Da completare — cod. {ev.get('code','?')}"
+        desc_parts = [
+            f"Canale: {canale}",
+            f"Codice: {ev.get('code','?')}",
+            f"Nome: {nome or '(da completare)'}",
+            f"Ospiti: {num_ospiti or '(da completare)'}",
+            f"Prezzo: {prezzo:.0f} €" if prezzo else "Prezzo: (da completare)",
+        ]
+        description = _cal_ics_escape("\n".join(desc_parts))
+        uid = ev.get("ical_uid") or f"{key}@appartamento-bot.vercel.app"
+        righe.extend([
+            "BEGIN:VEVENT",
+            f"UID:{uid}",
+            f"DTSTAMP:{now_stamp}",
+            f"DTSTART;VALUE=DATE:{ci}",
+            f"DTEND;VALUE=DATE:{co}",
+            f"SUMMARY:{_cal_ics_escape(summary)}",
+            f"DESCRIPTION:{description}",
+            "END:VEVENT",
+        ])
+    righe.append("END:VCALENDAR")
+    body = "\r\n".join(righe) + "\r\n"
+    return (body, 200, {"Content-Type": "text/calendar; charset=utf-8"})
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Fine modulo CHANNEL MANAGER
+# ════════════════════════════════════════════════════════════════════════════════
