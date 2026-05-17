@@ -76,12 +76,13 @@
     "code": "SIMTEST2026",
     "checkin": "20/06/2026",
     "checkout": "27/06/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
+    "stato": "complete",
+    "nome": "Mario",
+    "num_ospiti": 2,
+    "prezzo_eur": 320.0,
     "ical_uid": "simtest2026@airbnb.com",
     "created_at": "2026-05-17T23:22:16",
-    "_simulazione": true
+    "_simulazione": true,
+    "completed_at": "2026-05-17T21:22:48"
   }
 }
