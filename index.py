@@ -4903,16 +4903,24 @@ def calendar_ics():
         nome = ev.get("nome") or ""
         num_ospiti = ev.get("num_ospiti") or 0
         prezzo = ev.get("prezzo_eur") or 0.0
-        if ev.get("stato") == "complete" and nome:
+        stato_ev = ev.get("stato")
+        if stato_ev == "complete" and nome:
             summary = f"[{canale}] {nome} — {num_ospiti} ospiti — {prezzo:.0f}€"
+            placeholder = ""
+        elif stato_ev == "seeded":
+            # Eventi importati dal primo sync (preesistenti): segnati come occupato
+            # senza chiedere completamento (potrebbero essere blocchi manuali).
+            summary = f"[{canale}] Occupato"
+            placeholder = "(occupato — preesistente)"
         else:
             summary = f"[{canale}] Da completare — cod. {ev.get('code','?')}"
+            placeholder = "(da completare)"
         desc_parts = [
             f"Canale: {canale}",
             f"Codice: {ev.get('code','?')}",
-            f"Nome: {nome or '(da completare)'}",
-            f"Ospiti: {num_ospiti or '(da completare)'}",
-            f"Prezzo: {prezzo:.0f} €" if prezzo else "Prezzo: (da completare)",
+            f"Nome: {nome or placeholder}",
+            f"Ospiti: {num_ospiti or placeholder}",
+            f"Prezzo: {prezzo:.0f} €" if prezzo else f"Prezzo: {placeholder}",
         ]
         description = _cal_ics_escape("\n".join(desc_parts))
         uid = ev.get("ical_uid") or f"{key}@appartamento-bot.vercel.app"
