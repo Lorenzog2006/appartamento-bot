@@ -4647,6 +4647,43 @@ def _cal_count_notti(checkin, checkout):
         return 0
 
 
+def _cal_find_overlap_match(eventi_esistenti, channel, checkin, checkout):
+    """Cerca un evento esistente dello stesso canale che si sovrapponga in modo
+    sostanziale con (checkin, checkout). Serve a evitare falsi positivi quando
+    Booking rigenera UID per blocchi auto-rolling (il "passato" viene tagliato
+    o l'intero range slitta di 1 giorno → UID nuovo per stesso evento).
+
+    Ritorna la chiave dell'evento esistente match, o None se è davvero nuovo.
+    """
+    try:
+        c_in = datetime.strptime(checkin, "%d/%m/%Y")
+        c_out = datetime.strptime(checkout, "%d/%m/%Y")
+    except Exception:
+        return None
+    nuovo_durata = max(1, (c_out - c_in).days)
+    for k, v in eventi_esistenti.items():
+        if v.get("canale") != channel:
+            continue
+        try:
+            e_in = datetime.strptime(v["checkin"], "%d/%m/%Y")
+            e_out = datetime.strptime(v["checkout"], "%d/%m/%Y")
+        except Exception:
+            continue
+        # Calcola sovrapposizione (in giorni)
+        overlap_start = max(c_in, e_in)
+        overlap_end = min(c_out, e_out)
+        if overlap_start >= overlap_end:
+            continue
+        shared = (overlap_end - overlap_start).days
+        esistente_durata = max(1, (e_out - e_in).days)
+        # Se condividono >=50% di uno dei due, è lo stesso evento.
+        # 50% è abbastanza permissivo da catturare gli auto-roll (90%+) ma evita
+        # di unire due brevi soggiorni adiacenti diversi.
+        if shared / esistente_durata >= 0.5 or shared / nuovo_durata >= 0.5:
+            return k
+    return None
+
+
 def cal_extract_details_from_freetext(testo):
     """Usa Groq per estrarre {nome, num_ospiti, prezzo_eur} da una risposta libera del proprietario.
     Tollera formati diversi: 'Mario Rossi / 3 / 720', 'Mario 3 ospiti 720€', ecc.
@@ -4805,6 +4842,17 @@ def cron_sync_ical():
                 # Chiave canonica: <canale>_<code>. Garantisce idempotenza.
                 key = f"{channel}_{ev['code']}"
                 if key in eventi_esistenti:
+                    continue
+                # Dedup secondario per sovrapposizione date (gestisce auto-roll
+                # di Booking che cambia UID per blocchi che includono "oggi").
+                match_key = _cal_find_overlap_match(eventi_esistenti, channel, ev["checkin"], ev["checkout"])
+                if match_key:
+                    # Aggiorna le date dell'evento esistente per matchare il feed.
+                    # Non rigenera notifica, non aggiunge a pending: è solo un update.
+                    eventi_esistenti[match_key]["checkin"] = ev["checkin"]
+                    eventi_esistenti[match_key]["checkout"] = ev["checkout"]
+                    eventi_esistenti[match_key]["ical_uid"] = ev["uid"]
+                    modificato = True
                     continue
                 if is_first_sync:
                     # Seed silenzioso: salva ma non notifica e non chiede dettagli.
