@@ -7,10 +7,10 @@
     "stato": "complete",
     "nome": "Marek Lee",
     "num_ospiti": 3,
-    "prezzo_eur": 274.0,
+    "prezzo_eur": 265.5,
     "ical_uid": "56b6c2618dabfc87bab299e2e1f90e29@booking.com",
     "created_at": "2026-05-19T19:00:31",
-    "completed_at": "2026-05-19T19:04:46"
+    "completed_at": "2026-05-19T22:44:06"
   },
   "booking_17c801fbe4e7": {
     "canale": "booking",
@@ -29,48 +29,52 @@
     "code": "8853318aa6aa",
     "checkin": "21/05/2026",
     "checkout": "23/05/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
+    "stato": "complete",
+    "nome": "Dmitrii Shuklin",
+    "num_ospiti": 2,
+    "prezzo_eur": 193.68,
     "ical_uid": "8853318aa6aa210845d05686a4324252@booking.com",
-    "created_at": "2026-05-19T20:40:08"
+    "created_at": "2026-05-19T20:40:08",
+    "completed_at": "2026-05-19T22:44:06"
   },
   "booking_10bea018984b": {
     "canale": "booking",
     "code": "10bea018984b",
     "checkin": "23/05/2026",
     "checkout": "26/05/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
+    "stato": "complete",
+    "nome": "tjeerd sepers",
+    "num_ospiti": 2,
+    "prezzo_eur": 279.36,
     "ical_uid": "10bea018984b6cd166c2226425118031@booking.com",
-    "created_at": "2026-05-19T20:40:09"
+    "created_at": "2026-05-19T20:40:09",
+    "completed_at": "2026-05-19T22:44:06"
   },
   "booking_2f55814339ca": {
     "canale": "booking",
     "code": "2f55814339ca",
     "checkin": "03/08/2026",
     "checkout": "05/08/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
+    "stato": "complete",
+    "nome": "Joaquim Duch Morera",
+    "num_ospiti": 3,
+    "prezzo_eur": 344.0,
     "ical_uid": "2f55814339ca05866fa947ce52e77967@booking.com",
-    "created_at": "2026-05-19T20:40:09"
+    "created_at": "2026-05-19T20:40:09",
+    "completed_at": "2026-05-19T22:44:06"
   },
   "booking_6d888318d12c": {
     "canale": "booking",
     "code": "6d888318d12c",
     "checkin": "14/08/2026",
     "checkout": "19/08/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
+    "stato": "complete",
+    "nome": "Parádi Dzsesszika",
+    "num_ospiti": 3,
+    "prezzo_eur": 832.0,
     "ical_uid": "6d888318d12c286fdb6d1c8ecc9fc6ee@booking.com",
-    "created_at": "2026-05-19T20:40:09"
+    "created_at": "2026-05-19T20:40:09",
+    "completed_at": "2026-05-19T22:44:06"
   },
   "booking_1f82f17fa22e": {
     "canale": "booking",
@@ -83,5 +87,18 @@
     "prezzo_eur": 0.0,
     "ical_uid": "1f82f17fa22ea155a1baa333cdd551fb@booking.com",
     "created_at": "2026-05-19T20:40:09"
+  },
+  "manual_silvana_5219739219": {
+    "canale": "booking",
+    "code": "5219739219",
+    "checkin": "15/05/2026",
+    "checkout": "16/05/2026",
+    "stato": "complete",
+    "nome": "Silvana Basha",
+    "num_ospiti": 2,
+    "prezzo_eur": 36.0,
+    "ical_uid": "",
+    "created_at": "2026-05-19T22:44:06",
+    "completed_at": "2026-05-19T22:44:06"
   }
 }
