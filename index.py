@@ -2585,6 +2585,11 @@ def webhook():
                 invia_messaggio(chat_id, f"❌ Errore")
             return "ok"
 
+        # ── /calendario ── lista completa prenotazioni canali (dal giorno corrente) ──
+        if testo == "/calendario" and is_owner:
+            invia_messaggio(chat_id, cal_format_full_list(), parse_mode="Markdown")
+            return "ok"
+
         # ── /cal ── channel manager: lista stub in attesa di completamento ──
         if testo.startswith("/cal") and is_owner:
             parti = testo.split(maxsplit=1)
@@ -4892,6 +4897,52 @@ def cal_format_pending_list():
         )
     righe.append("\nRispondi con i dati della *prima* prenotazione nel formato:\n`nome / ospiti / prezzo`\nEs: `Mario Rossi / 3 / 720`")
     return "\n".join(righe)
+
+
+def cal_format_full_list():
+    """Ritorna un riepilogo markdown di tutte le prenotazioni dal canale (oggi in poi),
+    ordinate per data di check-in. Mostra anche quelle pending o seeded."""
+    eventi, _ = _cal_load_events()
+    if not eventi:
+        return "📭 Nessuna prenotazione dai canali (Airbnb/Booking).\n\nUsa /calsync per forzare un import."
+    oggi = datetime.now().date()
+    righe = []
+    for key, ev in eventi.items():
+        try:
+            ci = datetime.strptime(ev["checkin"], "%d/%m/%Y").date()
+            co = datetime.strptime(ev["checkout"], "%d/%m/%Y").date()
+        except Exception:
+            continue
+        if co < oggi:
+            continue  # già passate
+        righe.append((ci, co, ev))
+    righe.sort(key=lambda t: t[0])
+    if not righe:
+        return "📭 Nessuna prenotazione futura sui canali."
+    out = ["📅 *Prenotazioni canali — dal", oggi.strftime("%d/%m/%Y"), "in poi*\n"]
+    out = [f"📅 *Prenotazioni canali — dal {oggi.strftime('%d/%m/%Y')} in poi*\n"]
+    for ci, co, ev in righe:
+        canale = (ev.get("canale") or "?").title()
+        stato_ev = ev.get("stato", "")
+        notti = (co - ci).days
+        if stato_ev == "complete":
+            icon = "🟢"
+            corpo = (
+                f"{icon} *{canale}* — {ev['checkin']} → {ev['checkout']} ({notti} nott{'e' if notti==1 else 'i'})\n"
+                f"   👤 {ev.get('nome','?')} • {ev.get('num_ospiti',0)} ospit{'e' if ev.get('num_ospiti',0)==1 else 'i'} • {ev.get('prezzo_eur',0):.0f} €"
+            )
+        elif stato_ev == "seeded":
+            icon = "⚫"
+            corpo = f"{icon} *{canale}* — {ev['checkin']} → {ev['checkout']} ({notti} nott{'e' if notti==1 else 'i'}) — _preesistente_"
+        else:
+            icon = "🟡"
+            corpo = (
+                f"{icon} *{canale}* — {ev['checkin']} → {ev['checkout']} ({notti} nott{'e' if notti==1 else 'i'})\n"
+                f"   _da completare — cod. {ev.get('code','?')}_"
+            )
+        out.append(corpo)
+    out.append("\n_Legenda: 🟢 completa • 🟡 da completare (/cal per aggiungere dati) • ⚫ preesistente_")
+    return "\n\n".join(out)
 
 
 def _cal_notify_owner_new_stub(ev):
