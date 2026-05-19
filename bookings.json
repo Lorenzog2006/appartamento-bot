@@ -12,5 +12,14 @@
     "checkout": "17/05/2026",
     "lingua": "italian",
     "salvata": "16/05/2026 13:01"
+  },
+  "manual_1779225734": {
+    "nome": "Filippo",
+    "checkin": "19/05/2026",
+    "checkout": "20/05/2026",
+    "lingua": "italian",
+    "num_ospiti": 3,
+    "culla": true,
+    "salvata": "19/05/2026 21:22"
   }
 }
