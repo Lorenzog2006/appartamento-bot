@@ -276,6 +276,8 @@ Codice lucchetto parcheggio: Il codice del lucchetto del posto auto è 581
 Disponibile foto con parole chiave: keybox, locker, casella chiave, casier, boîte à clés, casillero, schließfach — descrizione: La keybox si trova qui
 # Aggiunto il 13/05/2026
 Quale è il parcheggio ?: Il codice del lucchetto che tiene la catenella è 581
+# Aggiunto il 19/05/2026
+Where is the umbrella ?: Non abbiamo ombrelli a casa mi dispiace
 
 [MEDIA]
 keybox, locker, casella chiave, casier, boîte à clés, casillero, schließfach = photo:AgACAgIAAxkBAAIDsmoEwjFcIoyqInpm3HRHZMwDKvolAAJbGWsbapAgSLI7qz6R8yg8AQADAgADeQADOwQ | La keybox si trova qui
