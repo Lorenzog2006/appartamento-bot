@@ -1,10 +1,11 @@
 {
   "20516342": {
-    "step": "culla",
+    "step": "contatto",
     "nome": "Filippo",
     "checkin": "19/05/2026",
     "checkout": "20/05/2026",
     "lingua": "italian",
-    "num_ospiti": 3
+    "num_ospiti": 3,
+    "culla": true
   }
 }
