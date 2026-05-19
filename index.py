@@ -1720,6 +1720,54 @@ SYSTEM_PROMPT = {
     ),
 }
 
+_LINGUA_LABEL = {
+    "italian": "italiano", "english": "inglese", "french": "francese",
+    "spanish": "spagnolo", "german": "tedesco", "portuguese": "portoghese",
+}
+
+def traduci_testo(testo, lingua_dest):
+    """Traduce un testo nella lingua dell'ospite (en/fr/es/de/pt). Best-effort.
+    Ritorna il testo tradotto, o l'originale in caso di errore."""
+    if not testo or not lingua_dest or lingua_dest == "italian":
+        return testo
+    label = _LINGUA_LABEL.get(lingua_dest, lingua_dest)
+    prompt = (
+        f"Traduci il seguente messaggio in {label} mantenendo tono, emoji e formattazione.\n"
+        f"Rispondi SOLO con la traduzione, senza prefissi, virgolette o spiegazioni.\n\n"
+        f"Messaggio:\n{testo}"
+    )
+    try:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {GROQ_KEY}",
+            "User-Agent": "groq-python/0.9.0"
+        })
+        r = urllib.request.urlopen(req, timeout=10)
+        out = json.loads(r.read())["choices"][0]["message"]["content"].strip()
+        # Rimuovi eventuali virgolette esterne
+        if len(out) >= 2 and out[0] in "\"'«" and out[-1] in "\"'»":
+            out = out[1:-1].strip()
+        return out or testo
+    except Exception:
+        return testo
+
+
+def _lingua_ospite(chat_id):
+    """Recupera la lingua salvata di un ospite (da users.json). Fallback: italian."""
+    try:
+        _carica_users_da_github()
+        u = _users.get(str(chat_id)) or {}
+        return u.get("lingua") or "italian"
+    except Exception:
+        return "italian"
+
+
 def traduci_keywords(keywords_it):
     """Traduce le parole chiave italiane in EN, FR, ES, DE e restituisce tutte le varianti."""
     prompt = (
@@ -2296,21 +2344,35 @@ def webhook():
                 # In takeover → niente prefix "💬" (sembra messaggio diretto)
                 in_takeover = is_in_takeover(wa_session_key)
                 prefix = "" if in_takeover else "💬 "
-                wa_invia(wa_numero, f"{prefix}{testo}")
+                # Auto-traduzione: se l'ospite ha scritto in altra lingua, traduci
+                lingua_ospite = _lingua_ospite(wa_session_key)
+                lingua_owner_msg = rileva_lingua(testo)
+                testo_finale = testo
+                tradotto = False
+                if lingua_ospite and lingua_ospite != "italian" and lingua_owner_msg != lingua_ospite:
+                    t = traduci_testo(testo, lingua_ospite)
+                    if t and t != testo:
+                        testo_finale = t
+                        tradotto = True
+                wa_invia(wa_numero, f"{prefix}{testo_finale}")
                 # Aggiorna anche la storia conversazione lato bot
                 try:
-                    aggiorna_storia(wa_session_key, "[Risposta diretta di Lorenzo]", testo)
+                    aggiorna_storia(wa_session_key, "[Risposta diretta di Lorenzo]", testo_finale)
                 except Exception:
                     pass
-                # Conferma a Lorenzo. Se in takeover, includi anche bottone Riattiva AI.
+                # Conferma a Lorenzo (mostra il testo tradotto se applicabile)
+                nota_trad = ""
+                if tradotto:
+                    label = _LINGUA_LABEL.get(lingua_ospite, lingua_ospite)
+                    nota_trad = f"\n\n🌍 _Tradotto in {label}:_\n`{testo_finale}`"
                 if in_takeover:
                     invia_bottoni(chat_id,
-                        f"✅ Risposta inviata su WhatsApp a +{wa_numero}\n\n💬 _Sei in takeover._ Continua pure a rispondere oppure ridai il controllo al bot 👇",
+                        f"✅ Risposta inviata su WhatsApp a +{wa_numero}{nota_trad}\n\n💬 _Sei in takeover._ Continua pure a rispondere oppure ridai il controllo al bot 👇",
                         [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{wa_session_key}"}]],
                         parse_mode="Markdown"
                     )
                 else:
-                    invia_messaggio(chat_id, f"✅ Risposta inviata su WhatsApp a +{wa_numero}!")
+                    invia_messaggio(chat_id, f"✅ Risposta inviata su WhatsApp a +{wa_numero}!{nota_trad}", parse_mode="Markdown")
                 # Offri di salvare in memoria
                 match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
                 if not match_domanda:
@@ -2330,15 +2392,29 @@ def webhook():
                 # In takeover → niente prefix "💬"
                 in_takeover = is_in_takeover(id_ospite)
                 prefix = "" if in_takeover else "💬 "
-                invia_messaggio(id_ospite, f"{prefix}{testo}")
+                # Auto-traduzione: se l'ospite ha scritto in altra lingua, traduci
+                lingua_ospite = _lingua_ospite(id_ospite)
+                lingua_owner_msg = rileva_lingua(testo)
+                testo_finale = testo
+                tradotto = False
+                if lingua_ospite and lingua_ospite != "italian" and lingua_owner_msg != lingua_ospite:
+                    t = traduci_testo(testo, lingua_ospite)
+                    if t and t != testo:
+                        testo_finale = t
+                        tradotto = True
+                invia_messaggio(id_ospite, f"{prefix}{testo_finale}")
+                nota_trad = ""
+                if tradotto:
+                    label = _LINGUA_LABEL.get(lingua_ospite, lingua_ospite)
+                    nota_trad = f"\n\n🌍 _Tradotto in {label}:_\n`{testo_finale}`"
                 if in_takeover:
                     invia_bottoni(chat_id,
-                        f"✅ Risposta inviata\n\n💬 _Sei in takeover._ Continua pure a rispondere oppure ridai il controllo al bot 👇",
+                        f"✅ Risposta inviata{nota_trad}\n\n💬 _Sei in takeover._ Continua pure a rispondere oppure ridai il controllo al bot 👇",
                         [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{id_ospite}"}]],
                         parse_mode="Markdown"
                     )
                 else:
-                    invia_messaggio(chat_id, "✅ Risposta inviata all'ospite!")
+                    invia_messaggio(chat_id, f"✅ Risposta inviata all'ospite!{nota_trad}", parse_mode="Markdown")
                 # Estrae la domanda sia dal formato ❓ "testo" che da ❓ testo
                 match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
                 if not match_domanda:
