@@ -1,0 +1,17 @@
+{
+  "turno_20260520": {
+    "checkout": "20/05/2026",
+    "next_checkin": null,
+    "ospite_uscente": "Filippo",
+    "num_ospiti_uscenti": 3,
+    "culla_uscente": true,
+    "ospite_entrante": null,
+    "num_ospiti_entranti": 0,
+    "culla_entrante": false,
+    "inviato_subito_at": null,
+    "inviato_reminder_at": null,
+    "confermato_at": null,
+    "confermato_msg": "",
+    "created_at": "2026-05-19T21:22:16"
+  }
+}
