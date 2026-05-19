@@ -1,8 +1,8 @@
 {
-  "totale": 152,
+  "totale": 153,
   "lingue": {
     "italian": 130,
-    "english": 13,
+    "english": 14,
     "french": 9
   },
   "argomenti": {
@@ -12,7 +12,7 @@
     "ristorante": 5,
     "spiaggia": 12,
     "wifi": 11,
-    "check-in": 21,
+    "check-in": 22,
     "emergenza": 1,
     "supermercato": 1
   }
