@@ -17,12 +17,13 @@
     "code": "17c801fbe4e7",
     "checkin": "19/05/2026",
     "checkout": "20/05/2026",
-    "stato": "pending_details",
-    "nome": "",
+    "stato": "complete",
+    "nome": "(Blocco Booking)",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
     "ical_uid": "17c801fbe4e758c498e981c2d89eaca9@booking.com",
-    "created_at": "2026-05-19T20:40:08"
+    "created_at": "2026-05-19T20:40:08",
+    "completed_at": "2026-05-19T22:45:34"
   },
   "booking_8853318aa6aa": {
     "canale": "booking",
@@ -81,12 +82,13 @@
     "code": "1f82f17fa22e",
     "checkin": "20/05/2027",
     "checkout": "19/11/2027",
-    "stato": "pending_details",
-    "nome": "",
+    "stato": "complete",
+    "nome": "(Blocco Booking)",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
     "ical_uid": "1f82f17fa22ea155a1baa333cdd551fb@booking.com",
-    "created_at": "2026-05-19T20:40:09"
+    "created_at": "2026-05-19T20:40:09",
+    "completed_at": "2026-05-19T22:45:34"
   },
   "manual_silvana_5219739219": {
     "canale": "booking",
