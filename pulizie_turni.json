@@ -25,8 +25,8 @@
     "culla_entrante": true,
     "inviato_subito_at": "2026-05-19T21:22:22",
     "inviato_reminder_at": null,
-    "confermato_at": null,
-    "confermato_msg": "",
+    "confermato_at": "2026-05-19T21:23:04",
+    "confermato_msg": "Ok",
     "created_at": "2026-05-19T21:22:18"
   }
 }
