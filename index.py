@@ -1726,9 +1726,10 @@ _LINGUA_LABEL = {
 }
 
 def traduci_testo(testo, lingua_dest):
-    """Traduce un testo nella lingua dell'ospite (en/fr/es/de/pt). Best-effort.
-    Ritorna il testo tradotto, o l'originale in caso di errore."""
-    if not testo or not lingua_dest or lingua_dest == "italian":
+    """Traduce un testo in qualsiasi lingua target. Best-effort.
+    Ritorna il testo tradotto, o l'originale in caso di errore.
+    Il chiamante è responsabile di non invocarla se source == dest."""
+    if not testo or not lingua_dest:
         return testo
     label = _LINGUA_LABEL.get(lingua_dest, lingua_dest)
     prompt = (
@@ -1756,6 +1757,22 @@ def traduci_testo(testo, lingua_dest):
         return out or testo
     except Exception:
         return testo
+
+
+def _domanda_per_owner(voce_pre, testo, italic=False):
+    """Formatta il testo di un ospite per la notifica all'owner.
+    Se la lingua non è italiano, appende una riga con la traduzione IT."""
+    body = f"_{testo}_" if italic else testo
+    out = f"{voce_pre}{body}"
+    try:
+        lingua = rileva_lingua(testo)
+        if lingua and lingua != "italian":
+            it = traduci_testo(testo, "italian")
+            if it and it.strip() and it != testo:
+                out += f"\n🇮🇹 _IT:_ {it}"
+    except Exception:
+        pass
+    return out
 
 
 def _lingua_ospite(chat_id):
@@ -2884,7 +2901,7 @@ def webhook():
                 nome_display = f"@{username}" if username else nome
                 _voce_pre = "🎙️ _Vocale trascritto:_ " if era_vocale else ""
                 invia_bottoni(int(OWNER_ID),
-                    f"⏸️ *[PAUSA]* {nome_display}\n\n❓ {_voce_pre}{testo}\n\n[ID:{chat_id}]",
+                    f"⏸️ *[PAUSA]* {nome_display}\n\n❓ {_domanda_per_owner(_voce_pre, testo)}\n\n[ID:{chat_id}]",
                     [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{chat_id}"}]],
                     parse_mode="Markdown"
                 )
@@ -2970,11 +2987,13 @@ def webhook():
                 nome_display = f"@{username}" if username else nome
                 _voce = "🎙️ Vocale trascritto: " if era_vocale else ""
                 _voce_md = "🎙️ _Vocale trascritto:_ " if era_vocale else ""
+                _q_md = _domanda_per_owner(_voce_md, testo)
+                _q    = _domanda_per_owner(_voce, testo)
                 if e_emergenza:
                     invia_messaggio(int(OWNER_ID),
                         f"🚨🚨 EMERGENZA TECNICA 🚨🚨\n\n"
                         f"Ospite: {nome_display} [ID:{chat_id}]\n\n"
-                        f"❓ {_voce}{testo}\n\n🤖 {reply}\n\n"
+                        f"❓ {_q}\n\n🤖 {reply}\n\n"
                         f"⚡ Rispondi subito all'ospite premendo Rispondi."
                     )
                 elif e_arrabbiato:
@@ -2982,7 +3001,7 @@ def webhook():
                         f"🚨 *ATTENZIONE — OSPITE ARRABBIATO*\n\n"
                         f"Tono frustrato/aggressivo rilevato.\n\n"
                         f"Ospite: {nome_display} [ID:{chat_id}]\n\n"
-                        f"❓ {_voce_md}_{testo}_\n\n"
+                        f"❓ {_domanda_per_owner(_voce_md, testo, italic=True)}\n\n"
                         f"🤖 {reply}\n\n"
                         f"💡 Suggerimento: rispondi tu di persona. Premi *Rispondi* o usa /pausa.",
                         [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]],
@@ -2992,18 +3011,19 @@ def webhook():
                     invia_bottoni(int(OWNER_ID),
                         f"😤 OSPITE INSODDISFATTO\n\n"
                         f"Ospite: {nome_display} [ID:{chat_id}]\n\n"
-                        f"❓ {_voce}{testo}\n\n"
+                        f"❓ {_q}\n\n"
                         f"🤖 {reply}\n\n"
                         f"👆 Premi Rispondi per contattarlo direttamente.",
                         [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]]
                     )
                 else:
                     invia_bottoni(int(OWNER_ID),
-                        f"📩 {nome_display} [ID:{chat_id}]\n\n❓ {_voce}{testo}\n\n🤖 {reply}",
+                        f"📩 {nome_display} [ID:{chat_id}]\n\n❓ {_q_md}\n\n🤖 {reply}",
                         [[
                             {"text": "💬 Prendi chat", "callback_data": f"TAKEOVER:{chat_id}"},
                             {"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}
-                        ]]
+                        ]],
+                        parse_mode="Markdown"
                     )
             except Exception:
                 pass
@@ -4381,7 +4401,7 @@ def whatsapp_webhook():
                 try:
                     _voce_pre = "🎙️ _Vocale trascritto:_ " if era_vocale else ""
                     invia_bottoni(int(OWNER_ID),
-                        f"⏸️ *[PAUSA WA]* {nome}\n\n❓ {_voce_pre}{testo}\n\n[WA:{wa_from}]",
+                        f"⏸️ *[PAUSA WA]* {nome}\n\n❓ {_domanda_per_owner(_voce_pre, testo)}\n\n[WA:{wa_from}]",
                         [[{"text": "▶️ Riattiva AI", "callback_data": f"RIPRENDI:{wa_session_id}"}]],
                         parse_mode="Markdown"
                     )
@@ -4447,7 +4467,7 @@ def whatsapp_webhook():
                         f"🚨 *ATTENZIONE — OSPITE WHATSAPP ARRABBIATO*\n\n"
                         f"Tono frustrato/aggressivo rilevato.\n\n"
                         f"Ospite: {nome}\n\n"
-                        f"❓ {_voce_pre_md}_{testo}_\n\n"
+                        f"❓ {_domanda_per_owner(_voce_pre_md, testo, italic=True)}\n\n"
                         f"🤖 {reply}\n\n"
                         f"💡 Rispondi tu in reply o usa /pausa wa_{wa_from}\n\n"
                         f"[WA:{wa_from}]",
@@ -4456,7 +4476,7 @@ def whatsapp_webhook():
                     )
                 else:
                     invia_bottoni(int(OWNER_ID),
-                        f"📱 *WhatsApp* — {nome}\n\n❓ {_voce_pre_md}{testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]",
+                        f"📱 *WhatsApp* — {nome}\n\n❓ {_domanda_per_owner(_voce_pre_md, testo)}\n\n🤖 {reply}\n\n[WA:{wa_from}]",
                         [[
                             {"text": "💬 Prendi chat", "callback_data": f"TAKEOVER:{wa_session_id}"},
                             {"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}
@@ -4478,7 +4498,7 @@ def whatsapp_webhook():
                 invia_messaggio(int(OWNER_ID),
                     f"🚨🚨 EMERGENZA WHATSAPP 🚨🚨\n\n"
                     f"Ospite WhatsApp: {nome} (+{wa_from})\n\n"
-                    f"❓ {_voce_pre}{testo}\n\n🤖 {reply}\n\n[WA:{wa_from}]"
+                    f"❓ {_domanda_per_owner(_voce_pre, testo)}\n\n🤖 {reply}\n\n[WA:{wa_from}]"
                 )
             except Exception:
                 pass
