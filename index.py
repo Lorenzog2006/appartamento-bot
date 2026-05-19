@@ -14,6 +14,8 @@ DASHBOARD_KEY  = (os.environ.get("DASHBOARD_KEY") or "").strip()
 WA_TOKEN        = (os.environ.get("WHATSAPP_TOKEN") or "").strip()
 WA_PHONE_ID     = (os.environ.get("WHATSAPP_PHONE_ID") or "").strip()
 WA_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "juanlespins2026").strip()
+WA_PULIZIE      = (os.environ.get("WA_PULIZIE") or "").strip()  # numero WhatsApp signora pulizie (es: 393201234567)
+NOME_PULIZIE    = (os.environ.get("NOME_PULIZIE") or "Signora delle pulizie").strip()
 
 REPO         = "Lorenzog2006/appartamento-bot"
 GITHUB_RAW   = f"https://raw.githubusercontent.com/{REPO}/main/appartamento.txt"
@@ -24,6 +26,7 @@ BOOKINGS_API    = f"https://api.github.com/repos/{REPO}/contents/bookings.json"
 CONVERSATIONS_API = f"https://api.github.com/repos/{REPO}/contents/conversations.json"
 USERS_API       = f"https://api.github.com/repos/{REPO}/contents/users.json"
 ANALYTICS_API   = f"https://api.github.com/repos/{REPO}/contents/analytics.json"
+PULIZIE_API     = f"https://api.github.com/repos/{REPO}/contents/pulizie_turni.json"
 INFO_PATH    = os.path.join(os.path.dirname(__file__), "appartamento.txt")
 
 # ── Stato sessioni ────────────────────────────────────────────────────────────
@@ -305,6 +308,207 @@ def wizard_pren_clear(chat_id):
         return True
     except Exception:
         return False
+
+
+# ── Storage turni pulizie (pulizie_turni.json su GitHub) ─────────────────────
+def _pulizie_load_raw():
+    """Legge pulizie_turni.json. Ritorna (dict, sha). 404 → ({}, None)."""
+    if not GITHUB_TOKEN:
+        return ({}, None)
+    try:
+        url = f"{PULIZIE_API}?t={int(datetime.now().timestamp())}"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "appartamento-bot"
+        })
+        r = urllib.request.urlopen(req, timeout=4)
+        data = json.loads(r.read())
+        contenuto = base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        return (json.loads(contenuto) if contenuto.strip() else {}, data["sha"])
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return ({}, None)
+        return ({}, None)
+    except Exception:
+        return ({}, None)
+
+
+def _pulizie_save_raw(turni, sha):
+    """PUT pulizie_turni.json. Su conflitto refetch sha e ritenta una volta."""
+    if not GITHUB_TOKEN:
+        return False
+    for _attempt in range(2):
+        try:
+            payload = {
+                "message": "Aggiorna turni pulizie",
+                "content": base64.b64encode(json.dumps(turni, ensure_ascii=False, indent=2).encode("utf-8")).decode("utf-8"),
+            }
+            if sha:
+                payload["sha"] = sha
+            req = urllib.request.Request(PULIZIE_API, data=json.dumps(payload).encode(), headers={
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "appartamento-bot"
+            }, method="PUT")
+            urllib.request.urlopen(req, timeout=8)
+            return True
+        except urllib.error.HTTPError as e:
+            if e.code in (409, 422):
+                _, sha = _pulizie_load_raw()
+                continue
+            return False
+        except Exception:
+            return False
+    return False
+
+
+def pulizie_turno_id_for_checkout(checkout_date):
+    """Chiave canonica turno per data check-out (DD/MM/YYYY → YYYYMMDD)."""
+    try:
+        dt = datetime.strptime(checkout_date, "%d/%m/%Y")
+        return f"turno_{dt.strftime('%Y%m%d')}"
+    except Exception:
+        return None
+
+
+def pulizie_upsert_turno(checkout, ospite_uscente, num_uscenti, culla_uscente,
+                          next_checkin=None, ospite_entrante=None, num_entranti=0, culla_entrante=False):
+    """Crea o aggiorna un turno per il checkout dato. Ritorna (id, turno) oppure (None, None)."""
+    tid = pulizie_turno_id_for_checkout(checkout)
+    if not tid:
+        return (None, None)
+    turni, sha = _pulizie_load_raw()
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    t = turni.get(tid) or {
+        "checkout": checkout,
+        "next_checkin": None,
+        "ospite_uscente": "",
+        "num_ospiti_uscenti": 0,
+        "culla_uscente": False,
+        "ospite_entrante": None,
+        "num_ospiti_entranti": 0,
+        "culla_entrante": False,
+        "inviato_subito_at": None,
+        "inviato_reminder_at": None,
+        "confermato_at": None,
+        "confermato_msg": "",
+        "created_at": now,
+    }
+    # Aggiorna info uscente
+    if ospite_uscente:
+        t["ospite_uscente"] = ospite_uscente
+    if num_uscenti:
+        t["num_ospiti_uscenti"] = int(num_uscenti)
+    t["culla_uscente"] = bool(culla_uscente)
+    # Aggiorna info entrante (se passato)
+    if next_checkin:
+        t["next_checkin"] = next_checkin
+    if ospite_entrante:
+        t["ospite_entrante"] = ospite_entrante
+    if num_entranti:
+        t["num_ospiti_entranti"] = int(num_entranti)
+    if culla_entrante is not None:
+        t["culla_entrante"] = bool(culla_entrante)
+    turni[tid] = t
+    _pulizie_save_raw(turni, sha)
+    return (tid, t)
+
+
+def pulizie_mark_inviato(tid, tipo):
+    """tipo = 'subito' | 'reminder'. Marca il turno con timestamp invio."""
+    turni, sha = _pulizie_load_raw()
+    if tid not in turni:
+        return False
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    key = "inviato_subito_at" if tipo == "subito" else "inviato_reminder_at"
+    turni[tid][key] = now
+    return _pulizie_save_raw(turni, sha)
+
+
+def pulizie_mark_confermato(tid, msg_testo):
+    """Marca un turno come confermato dalla signora."""
+    turni, sha = _pulizie_load_raw()
+    if tid not in turni:
+        return False
+    turni[tid]["confermato_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    turni[tid]["confermato_msg"] = (msg_testo or "")[:200]
+    return _pulizie_save_raw(turni, sha)
+
+
+def pulizie_trova_ultimo_aperto():
+    """Ritorna (id, turno) dell'ultimo turno inviato e non ancora confermato. Altrimenti None."""
+    turni, _ = _pulizie_load_raw()
+    aperti = [(k, v) for k, v in turni.items()
+              if (v.get("inviato_subito_at") or v.get("inviato_reminder_at"))
+              and not v.get("confermato_at")]
+    if not aperti:
+        return (None, None)
+    # Ordina per data check-out più recente (decrescente)
+    aperti.sort(key=lambda kv: kv[1].get("checkout", ""),
+                reverse=False)
+    # Prendi quello con checkout più vicino a oggi (oggi o ieri tipicamente)
+    oggi = datetime.now().date()
+    miglior = None
+    miglior_diff = None
+    for k, v in aperti:
+        try:
+            d = datetime.strptime(v["checkout"], "%d/%m/%Y").date()
+            diff = abs((d - oggi).days)
+            if miglior_diff is None or diff < miglior_diff:
+                miglior = (k, v)
+                miglior_diff = diff
+        except Exception:
+            continue
+    return miglior or (aperti[-1][0], aperti[-1][1])
+
+
+def pulizie_format_riepilogo():
+    """Riepilogo turni pulizie per /pulizie. Mostra futuri + ultimi 3 passati."""
+    turni, _ = _pulizie_load_raw()
+    if not turni:
+        return "🧹 Nessun turno pulizie registrato.\n\nI turni vengono creati automaticamente quando completi una prenotazione."
+    oggi = datetime.now().date()
+    items = []
+    for tid, t in turni.items():
+        try:
+            d = datetime.strptime(t["checkout"], "%d/%m/%Y").date()
+        except Exception:
+            continue
+        items.append((d, tid, t))
+    items.sort(key=lambda x: x[0])
+    futuri = [i for i in items if i[0] >= oggi]
+    passati = [i for i in items if i[0] < oggi][-3:]
+    out = ["🧹 *Turni pulizie*\n"]
+    def render(d, tid, t):
+        if t.get("confermato_at"):
+            icon = "✅"
+            stato = f"_confermato_"
+        elif t.get("inviato_subito_at") or t.get("inviato_reminder_at"):
+            icon = "📤"
+            stato = "_inviato, in attesa OK_"
+        else:
+            icon = "⏳"
+            stato = "_da inviare_"
+        uscente = t.get("ospite_uscente") or "—"
+        n_u = t.get("num_ospiti_uscenti", 0)
+        entrante = t.get("ospite_entrante") or "vuoto"
+        n_e = t.get("num_ospiti_entranti", 0)
+        culla_e = " 🛏️" if t.get("culla_entrante") else ""
+        riga_entra = f"{entrante} ({n_e}){culla_e}" if entrante and entrante != "vuoto" else "vuoto"
+        return f"{icon} *{t['checkout']}* — {uscente} ({n_u}) → {riga_entra}   {stato}"
+    if passati:
+        out.append("\n_Ultimi turni:_")
+        for d, tid, t in passati:
+            out.append(render(d, tid, t))
+    if futuri:
+        out.append("\n_Prossimi turni:_")
+        for d, tid, t in futuri:
+            out.append(render(d, tid, t))
+    if not futuri and not passati:
+        out.append("_Nessun turno._")
+    return "\n".join(out)
 
 
 def _topic_di(testo):
@@ -964,7 +1168,7 @@ def carica_prenotazioni():
     except Exception:
         return {}, None
 
-def salva_prenotazione(chat_id, nome, checkin, checkout, lingua):
+def salva_prenotazione(chat_id, nome, checkin, checkout, lingua, num_ospiti=0, culla=False):
     if not GITHUB_TOKEN:
         return False
     try:
@@ -974,6 +1178,8 @@ def salva_prenotazione(chat_id, nome, checkin, checkout, lingua):
             "checkin": checkin,
             "checkout": checkout,
             "lingua": lingua,
+            "num_ospiti": int(num_ospiti or 0),
+            "culla": bool(culla),
             "salvata": datetime.now().strftime("%d/%m/%Y %H:%M")
         }
         contenuto_nuovo = json.dumps(prenotazioni, ensure_ascii=False, indent=2)
@@ -1166,6 +1372,269 @@ def _invia_a_cliente(chat_id_str, testo, nome_ospite="ospite", tipo_promemoria="
         except Exception:
             pass
         return False
+
+
+# ── Invio turno pulizie via WhatsApp ─────────────────────────────────────────
+def _fmt_data_pulizie(data_str):
+    """22/06/2026 → 'lunedì 22/06'"""
+    try:
+        dt = datetime.strptime(data_str, "%d/%m/%Y")
+        giorni = ["lunedì","martedì","mercoledì","giovedì","venerdì","sabato","domenica"]
+        return f"{giorni[dt.weekday()]} {dt.strftime('%d/%m')}"
+    except Exception:
+        return data_str or "?"
+
+
+def _testo_turno_pulizie(turno):
+    """Compone il messaggio markdown del turno per la signora."""
+    co_str = _fmt_data_pulizie(turno.get("checkout", ""))
+    uscente = turno.get("ospite_uscente") or "—"
+    n_uscenti = int(turno.get("num_ospiti_uscenti") or 0)
+    culla_u = turno.get("culla_uscente")
+    parts = [f"🧹 *Turno pulizie*\n"]
+    parts.append(f"📅 *Check-out:* {co_str} (ore 10:00)")
+    parts.append(f"👤 Esce: *{uscente}* — {n_uscenti} ospit{'e' if n_uscenti==1 else 'i'}")
+    if culla_u:
+        parts.append(f"🛏️ Culla da smontare")
+    nc = turno.get("next_checkin")
+    if nc:
+        nc_str = _fmt_data_pulizie(nc)
+        entrante = turno.get("ospite_entrante") or "—"
+        n_entranti = int(turno.get("num_ospiti_entranti") or 0)
+        culla_e = turno.get("culla_entrante")
+        parts.append(f"\n📅 *Check-in:* {nc_str} (ore 16:00)")
+        parts.append(f"👤 Entra: *{entrante}* — {n_entranti} ospit{'e' if n_entranti==1 else 'i'}")
+        if culla_e:
+            parts.append(f"🛏️ *Culla da MONTARE* ⚠️")
+    else:
+        parts.append(f"\n_(nessun check-in lo stesso giorno)_")
+    parts.append(f"\nQuando hai visto rispondi *ok* così so che hai letto. Grazie! 🙏")
+    return "\n".join(parts)
+
+
+def invia_turno_pulizie(turno, tipo):
+    """tipo = 'subito' | 'reminder'. Invia il messaggio alla signora via WA.
+    Ritorna True se inviato (auto o template), False se fallback manuale."""
+    if not WA_PULIZIE:
+        # Niente numero configurato: notifica Lorenzo per copia/incolla
+        if OWNER_ID:
+            try:
+                testo = _testo_turno_pulizie(turno)
+                invia_messaggio(int(OWNER_ID),
+                    f"⚠️ *WA_PULIZIE non configurato*\n\n"
+                    f"Copia/incolla questo messaggio alla signora:\n\n"
+                    f"```\n{testo}\n```",
+                    parse_mode="Markdown"
+                )
+            except Exception:
+                pass
+        return False
+    testo = _testo_turno_pulizie(turno)
+    prefisso_tipo = "🔔 *Reminder turno di oggi:*\n\n" if tipo == "reminder" else ""
+    testo_finale = prefisso_tipo + testo
+    # Tentativo 1: invio diretto (gratis se in finestra 24h)
+    try:
+        wa_invia(WA_PULIZIE, testo_finale)
+        if OWNER_ID:
+            try:
+                invia_messaggio(int(OWNER_ID),
+                    f"✅ Turno pulizie {tipo} inviato a {NOME_PULIZIE} (+{WA_PULIZIE})",
+                    parse_mode="Markdown"
+                )
+            except Exception:
+                pass
+        return True
+    except Exception:
+        pass
+    # Tentativo 2: template Meta dedicato (se approvato — fallisce silenzioso se no)
+    try:
+        if wa_invia_template(WA_PULIZIE, "turno_pulizie", NOME_PULIZIE):
+            # Dopo template (apre conv) prova a mandare il dettaglio in free-form
+            try:
+                wa_invia(WA_PULIZIE, testo_finale)
+            except Exception:
+                pass
+            if OWNER_ID:
+                try:
+                    invia_messaggio(int(OWNER_ID),
+                        f"✅ Template `turno_pulizie` inviato a {NOME_PULIZIE}",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+            return True
+    except Exception:
+        pass
+    # Fallback: notifica Lorenzo per copia/incolla manuale
+    if OWNER_ID:
+        try:
+            import urllib.parse as _urlp
+            link_wa = f"https://wa.me/{WA_PULIZIE}?text={_urlp.quote(testo_finale)}"
+            invia_bottoni(int(OWNER_ID),
+                f"📤 *Turno pulizie da inviare manualmente*\n\n"
+                f"_Auto-invio fallito (fuori finestra 24h / template non approvato)_\n\n"
+                f"```\n{testo_finale}\n```",
+                [[{"text": "📲 Apri WhatsApp precompilato", "url": link_wa}]],
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+    return False
+
+
+def pulizie_trigger_da_prenotazione(nome, checkin, checkout, num_ospiti, culla):
+    """Hook chiamato quando una prenotazione viene completata o creata manualmente.
+    Aggiorna due turni:
+      - Turno del CHECKOUT di questa prenotazione (l'ospite ESCE)
+      - Turno del CHECKIN di questa prenotazione (l'ospite ENTRA — pulizia di chi è uscito)
+    Se sono il primo invio per il turno, parte la notifica 'subito'."""
+    if not (checkin and checkout):
+        return
+    # 1) Turno del CHECKOUT (questo ospite esce)
+    tid_out, _t = pulizie_upsert_turno(
+        checkout=checkout,
+        ospite_uscente=nome, num_uscenti=num_ospiti, culla_uscente=culla,
+    )
+    # Se c'è un'altra prenotazione che fa check-in il giorno del check-out di questa,
+    # popoliamo anche la sezione "entrante". Cerchiamo sia in calendar_events.json
+    # sia in bookings.json.
+    if tid_out:
+        try:
+            entrante = _pulizie_trova_entrante(checkout)
+            if entrante:
+                pulizie_upsert_turno(
+                    checkout=checkout,
+                    ospite_uscente=nome, num_uscenti=num_ospiti, culla_uscente=culla,
+                    next_checkin=entrante["checkin"],
+                    ospite_entrante=entrante.get("nome",""),
+                    num_entranti=entrante.get("num_ospiti",0),
+                    culla_entrante=entrante.get("culla", False),
+                )
+        except Exception:
+            pass
+    # 2) Turno del CHECKIN di questa prenotazione (qualcun altro esce, questo entra)
+    tid_in, _t2 = pulizie_upsert_turno(
+        checkout=checkin,  # il "checkout" di QUEL turno = il checkin di questa
+        ospite_uscente="",  # non noto da qui, viene popolato dall'altra parte se esiste
+        num_uscenti=0, culla_uscente=False,
+        next_checkin=checkin,
+        ospite_entrante=nome, num_entranti=num_ospiti, culla_entrante=culla,
+    )
+    # Se c'è una prenotazione che fa check-out lo stesso giorno, popola l'uscente
+    if tid_in:
+        try:
+            uscente = _pulizie_trova_uscente(checkin)
+            if uscente:
+                pulizie_upsert_turno(
+                    checkout=checkin,
+                    ospite_uscente=uscente.get("nome",""),
+                    num_uscenti=uscente.get("num_ospiti",0),
+                    culla_uscente=uscente.get("culla", False),
+                    next_checkin=checkin,
+                    ospite_entrante=nome, num_entranti=num_ospiti, culla_entrante=culla,
+                )
+        except Exception:
+            pass
+    # Manda notifica "subito" per ogni turno che non è ancora stato inviato
+    turni, _ = _pulizie_load_raw()
+    for tid in (tid_out, tid_in):
+        if not tid or tid not in turni:
+            continue
+        t = turni[tid]
+        if not t.get("inviato_subito_at"):
+            try:
+                if invia_turno_pulizie(t, "subito"):
+                    pulizie_mark_inviato(tid, "subito")
+            except Exception:
+                pass
+
+
+def _pulizie_trova_entrante(data_str):
+    """Trova una prenotazione (manuale o canale) che ha checkin == data_str. Ritorna dict o None."""
+    # Prenotazioni manuali
+    try:
+        prenotazioni, _ = carica_prenotazioni()
+        for cid, p in prenotazioni.items():
+            if p.get("checkin") == data_str:
+                return {
+                    "nome": p.get("nome",""),
+                    "checkin": data_str,
+                    "num_ospiti": p.get("num_ospiti", 0),
+                    "culla": p.get("culla", False),
+                }
+    except Exception:
+        pass
+    # Eventi canale
+    try:
+        eventi, _ = _cal_load_events()
+        for k, ev in eventi.items():
+            if ev.get("checkin") == data_str and ev.get("stato") == "complete":
+                return {
+                    "nome": ev.get("nome",""),
+                    "checkin": data_str,
+                    "num_ospiti": ev.get("num_ospiti", 0),
+                    "culla": ev.get("culla", False),
+                }
+    except Exception:
+        pass
+    return None
+
+
+def _pulizie_trova_uscente(data_str):
+    """Trova prenotazione con checkout == data_str. Ritorna dict o None."""
+    try:
+        prenotazioni, _ = carica_prenotazioni()
+        for cid, p in prenotazioni.items():
+            if p.get("checkout") == data_str:
+                return {
+                    "nome": p.get("nome",""),
+                    "checkout": data_str,
+                    "num_ospiti": p.get("num_ospiti", 0),
+                    "culla": p.get("culla", False),
+                }
+    except Exception:
+        pass
+    try:
+        eventi, _ = _cal_load_events()
+        for k, ev in eventi.items():
+            if ev.get("checkout") == data_str and ev.get("stato") == "complete":
+                return {
+                    "nome": ev.get("nome",""),
+                    "checkout": data_str,
+                    "num_ospiti": ev.get("num_ospiti", 0),
+                    "culla": ev.get("culla", False),
+                }
+    except Exception:
+        pass
+    return None
+
+
+def esegui_reminder_pulizie():
+    """Cron mattina: per ogni turno con checkout == oggi e reminder non ancora inviato, manda reminder."""
+    inviati = 0
+    try:
+        oggi = datetime.now().date()
+        turni, _ = _pulizie_load_raw()
+        for tid, t in turni.items():
+            try:
+                co_d = datetime.strptime(t["checkout"], "%d/%m/%Y").date()
+            except Exception:
+                continue
+            if co_d != oggi:
+                continue
+            if t.get("inviato_reminder_at"):
+                continue
+            if t.get("confermato_at"):
+                continue
+            if invia_turno_pulizie(t, "reminder"):
+                pulizie_mark_inviato(tid, "reminder")
+                inviati += 1
+    except Exception as e:
+        try:
+            log_errore("esegui_reminder_pulizie", e)
+        except Exception:
+            pass
+    return inviati
 
 
 def esegui_promemoria():
@@ -2211,12 +2680,54 @@ def webhook():
                 stato = wizard_pren_get(cb_chat_id)
                 if stato:
                     stato["lingua"] = lingua_scelta
-                    stato["step"] = "contatto"
+                    stato["step"] = "ospiti"
                     wizard_pren_set(cb_chat_id, stato)
                     modifica_messaggio(cb_chat_id, cb_msg_id,
                         cb_testo + f"\n\n✅ Lingua: *{lingua_scelta}*", parse_mode="Markdown", bottoni=[])
                     invia_messaggio(cb_chat_id,
-                        "📅 *Passo 4/4* — Come contatti il cliente?\n\n"
+                        "📅 *Passo 4/6* — Quanti ospiti?\n\n"
+                        "Scrivi solo il numero (es: `3`)",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    modifica_messaggio(cb_chat_id, cb_msg_id, "⚠️ Sessione prenotazione scaduta. Usa /prenotazione per ricominciare.")
+
+            # ── Calendario canale: culla sì/no per stub appena completato ──
+            elif cb_data.startswith("CAL_CULLA:"):
+                # formato: CAL_CULLA:<event_key>:yes|no
+                _, ev_key, yn = cb_data.split(":", 2)
+                culla = (yn == "yes")
+                cal_set_culla(ev_key, culla)
+                modifica_messaggio(cb_chat_id, cb_msg_id,
+                    cb_testo + f"\n\n✅ Culla: *{'SÌ 🛏️' if culla else 'no'}*",
+                    parse_mode="Markdown", bottoni=[])
+                # Trigger pulizie partendo da questo evento
+                try:
+                    eventi, _ = _cal_load_events()
+                    ev = eventi.get(ev_key) or {}
+                    pulizie_trigger_da_prenotazione(
+                        ev.get("nome") or "",
+                        ev.get("checkin") or "",
+                        ev.get("checkout") or "",
+                        int(ev.get("num_ospiti") or 0),
+                        culla,
+                    )
+                except Exception:
+                    pass
+
+            # ── Prenotazione: culla sì/no ──
+            elif cb_data.startswith("PREN_CULLA:"):
+                culla_scelta = cb_data.split(":", 1)[1] == "yes"
+                stato = wizard_pren_get(cb_chat_id)
+                if stato:
+                    stato["culla"] = culla_scelta
+                    stato["step"] = "contatto"
+                    wizard_pren_set(cb_chat_id, stato)
+                    modifica_messaggio(cb_chat_id, cb_msg_id,
+                        cb_testo + f"\n\n✅ Culla: *{'SÌ 🛏️' if culla_scelta else 'no'}*",
+                        parse_mode="Markdown", bottoni=[])
+                    invia_messaggio(cb_chat_id,
+                        "📅 *Passo 6/6* — Come contatti il cliente?\n\n"
                         "Scrivi una di queste opzioni:\n"
                         "• `wa 393201234567` (numero WhatsApp con prefisso paese, senza +)\n"
                         "• `tg 8668813727` (chat ID Telegram dell'ospite)\n"
@@ -2526,8 +3037,17 @@ def webhook():
                 and str(chat_id) not in _upload_media
                 and str(chat_id) not in _attesa_correzione_owner
                 and cal_has_pending()):
-            risposta_cal = cal_complete_oldest_stub(testo)
+            risposta_cal, key_completato = cal_complete_oldest_stub(testo)
             invia_messaggio(chat_id, risposta_cal, parse_mode="Markdown")
+            if key_completato:
+                invia_bottoni(chat_id,
+                    "🛏️ Serve montare la *culla* per un neonato in questa prenotazione?",
+                    [[
+                        {"text": "🛏️ Sì, serve culla", "callback_data": f"CAL_CULLA:{key_completato}:yes"},
+                        {"text": "❌ No",              "callback_data": f"CAL_CULLA:{key_completato}:no"},
+                    ]],
+                    parse_mode="Markdown"
+                )
             return "ok"
 
         # ── Proprietario scrive info direttamente → chiede se salvare ──
@@ -2590,6 +3110,11 @@ def webhook():
             invia_messaggio(chat_id, cal_format_full_list(), parse_mode="Markdown")
             return "ok"
 
+        # ── /pulizie ── riepilogo turni pulizie ──
+        if testo == "/pulizie" and is_owner:
+            invia_messaggio(chat_id, pulizie_format_riepilogo(), parse_mode="Markdown")
+            return "ok"
+
         # ── /cal ── channel manager: lista stub in attesa di completamento ──
         if testo.startswith("/cal") and is_owner:
             parti = testo.split(maxsplit=1)
@@ -2622,7 +3147,7 @@ def webhook():
         if testo == "/prenotazione" and is_owner:
             wizard_pren_set(chat_id, {"step": "nome"})
             invia_messaggio(chat_id,
-                "📅 *Nuova prenotazione* — passo 1/4\n\n"
+                "📅 *Nuova prenotazione* — passo 1/6\n\n"
                 "Come si chiama l'ospite?\n\n"
                 "_(scrivi /annulla per annullare in qualsiasi momento)_",
                 parse_mode="Markdown"
@@ -2644,7 +3169,7 @@ def webhook():
                 wizard_pren_set(chat_id, stato)
                 invia_messaggio(chat_id,
                     f"✅ Ospite: *{stato['nome']}*\n\n"
-                    f"📅 *Passo 2/4* — Date di check-in e check-out\n\n"
+                    f"📅 *Passo 2/6* — Date di check-in e check-out\n\n"
                     f"Scrivi in uno di questi formati:\n"
                     f"• `15/06/2026 - 22/06/2026`\n"
                     f"• `15 giugno - 22 giugno`\n"
@@ -2666,7 +3191,7 @@ def webhook():
                 wizard_pren_set(chat_id, stato)
                 invia_bottoni(chat_id,
                     f"✅ Check-in: {ci}\n✅ Check-out: {co}\n\n"
-                    f"📅 *Passo 3/4* — Lingua dell'ospite",
+                    f"📅 *Passo 3/6* — Lingua dell'ospite",
                     [[
                         {"text": "🇮🇹 Italiano", "callback_data": "PREN_LANG:italian"},
                         {"text": "🇬🇧 English", "callback_data": "PREN_LANG:english"}
@@ -2675,6 +3200,28 @@ def webhook():
                         {"text": "🇪🇸 Español", "callback_data": "PREN_LANG:spanish"}
                     ], [
                         {"text": "🇩🇪 Deutsch", "callback_data": "PREN_LANG:german"}
+                    ]],
+                    parse_mode="Markdown"
+                )
+                return "ok"
+            elif stato["step"] == "ospiti":
+                # Step "ospiti": numero di persone (cifra)
+                try:
+                    n = int(re.sub(r"\D", "", testo.strip()) or "0")
+                except Exception:
+                    n = 0
+                if n <= 0 or n > 20:
+                    invia_messaggio(chat_id, "❌ Numero non valido. Scrivi solo il numero di ospiti (es: `3`).", parse_mode="Markdown")
+                    return "ok"
+                stato["num_ospiti"] = n
+                stato["step"] = "culla"
+                wizard_pren_set(chat_id, stato)
+                invia_bottoni(chat_id,
+                    f"✅ Ospiti: *{n}*\n\n"
+                    f"📅 *Passo 5/6* — 🛏️ Serve montare la culla per un neonato?",
+                    [[
+                        {"text": "🛏️ Sì, serve culla", "callback_data": "PREN_CULLA:yes"},
+                        {"text": "❌ No",              "callback_data": "PREN_CULLA:no"},
                     ]],
                     parse_mode="Markdown"
                 )
@@ -2707,7 +3254,9 @@ def webhook():
                         parse_mode="Markdown"
                     )
                     return "ok"
-                ok = salva_prenotazione(chat_id_finale, stato["nome"], stato["checkin"], stato["checkout"], stato["lingua"])
+                num_ospiti = int(stato.get("num_ospiti") or 0)
+                culla = bool(stato.get("culla"))
+                ok = salva_prenotazione(chat_id_finale, stato["nome"], stato["checkin"], stato["checkout"], stato["lingua"], num_ospiti=num_ospiti, culla=culla)
                 wizard_pren_clear(chat_id)
                 if ok:
                     if canale:
@@ -2716,13 +3265,19 @@ def webhook():
                         riga_canale = "ℹ️ _Nessun canale impostato → niente promemoria automatici per questa prenotazione._"
                     invia_messaggio(chat_id,
                         f"✅ *Prenotazione salvata!*\n\n"
-                        f"👤 {stato['nome']}\n"
+                        f"👤 {stato['nome']} ({num_ospiti} ospit{'e' if num_ospiti==1 else 'i'})\n"
                         f"📅 Check-in: {stato['checkin']}\n"
                         f"🏁 Check-out: {stato['checkout']}\n"
-                        f"🌍 Lingua: {stato['lingua']}\n\n"
+                        f"🌍 Lingua: {stato['lingua']}\n"
+                        f"🛏️ Culla: {'SÌ' if culla else 'no'}\n\n"
                         f"{riga_canale}",
                         parse_mode="Markdown"
                     )
+                    # Trigger pulizie: aggiorna turno per il check-out e turno per il check-in
+                    try:
+                        pulizie_trigger_da_prenotazione(stato["nome"], stato["checkin"], stato["checkout"], num_ospiti, culla)
+                    except Exception:
+                        pass
                 else:
                     invia_messaggio(chat_id, "❌ Errore nel salvataggio. Riprova.")
                 return "ok"
@@ -3102,7 +3657,7 @@ def cron_scheduled():
     if not auth_ok:
         return ("Forbidden", 403)
 
-    risultato = {"promemoria": None, "report_mensile": None}
+    risultato = {"promemoria": None, "report_mensile": None, "reminder_pulizie": None}
     # Sempre: esegui promemoria
     try:
         risultato["promemoria"] = esegui_promemoria()
@@ -3112,6 +3667,16 @@ def cron_scheduled():
         except Exception:
             pass
         risultato["promemoria"] = "errore"
+
+    # Sempre: reminder pulizie mattina dei check-out di oggi
+    try:
+        risultato["reminder_pulizie"] = esegui_reminder_pulizie()
+    except Exception as e:
+        try:
+            log_errore("cron_reminder_pulizie_outer", e)
+        except Exception:
+            pass
+        risultato["reminder_pulizie"] = "errore"
 
     # Solo il 1° del mese: report mensile
     try:
@@ -4387,6 +4952,39 @@ def whatsapp_webhook():
         else:
             testo = msg["text"]["body"]
 
+        # ── Intercept signora pulizie ──
+        # Se il mittente è il numero della signora delle pulizie, trattiamo come
+        # conferma del turno aperto (qualsiasi testo conta come "ok"). Se non c'è
+        # turno aperto, inoltriamo a Lorenzo come messaggio normale.
+        if WA_PULIZIE and wa_from == WA_PULIZIE:
+            tid, turno = pulizie_trova_ultimo_aperto()
+            if tid:
+                pulizie_mark_confermato(tid, testo)
+                if OWNER_ID:
+                    try:
+                        invia_messaggio(int(OWNER_ID),
+                            f"✅ *{NOME_PULIZIE} ha confermato* il turno del {turno.get('checkout','?')}\n\n"
+                            f"💬 _Risposta:_ {testo}",
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+                try:
+                    wa_invia(wa_from, "👍 Grazie, ricevuto!")
+                except Exception:
+                    pass
+                return "ok"
+            # Nessun turno aperto: inoltra a Lorenzo come notifica
+            if OWNER_ID:
+                try:
+                    invia_messaggio(int(OWNER_ID),
+                        f"📩 *{NOME_PULIZIE}* (nessun turno aperto):\n\n💬 {testo}",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+            return "ok"
+
         # Chiave sessione WhatsApp separata da Telegram
         wa_session_id = f"wa_{wa_from}"
 
@@ -4833,26 +5431,25 @@ def cal_extract_details_from_freetext(testo):
 
 def cal_complete_oldest_stub(testo_risposta):
     """Completa il primo stub in coda con i dati estratti da testo_risposta.
-    Ritorna stringa di conferma da mandare al proprietario."""
+    Ritorna (stringa_conferma, key_evento_completato) — key è None se errore."""
     stato, sha_w = _cal_load_wizard_state()
     pending = stato.get("pending_completions") or []
     if not pending:
-        return "⚠️ Nessuno stub calendario in attesa."
+        return ("⚠️ Nessuno stub calendario in attesa.", None)
     eventi, sha_e = _cal_load_events()
     key = pending[0]
     ev = eventi.get(key)
     if not ev:
-        # Stub orfano: rimuovi dalla coda
         stato["pending_completions"] = pending[1:]
         _cal_save_wizard_state(stato, sha_w)
-        return "⚠️ Stub non trovato (forse cancellato). Coda ripulita."
+        return ("⚠️ Stub non trovato (forse cancellato). Coda ripulita.", None)
     dati = cal_extract_details_from_freetext(testo_risposta)
     if not dati:
-        return (
+        return ((
             "❌ Non sono riuscito a interpretare la risposta.\n\n"
             "Riprova con un formato tipo: `Mario Rossi / 3 / 720`\n"
             "oppure: `nome Mario Rossi, 3 ospiti, 720 euro`"
-        )
+        ), None)
     ev["nome"] = dati["nome"] or ev.get("nome", "")
     ev["num_ospiti"] = dati["num_ospiti"] or ev.get("num_ospiti", 0)
     ev["prezzo_eur"] = dati["prezzo_eur"] or ev.get("prezzo_eur", 0.0)
@@ -4863,12 +5460,12 @@ def cal_complete_oldest_stub(testo_risposta):
     stato["pending_completions"] = pending[1:]
     ok_w = _cal_save_wizard_state(stato, sha_w)
     if not (ok_ev and ok_w):
-        return "⚠️ Errore nel salvataggio su GitHub. Riprova fra qualche secondo."
+        return ("⚠️ Errore nel salvataggio su GitHub. Riprova fra qualche secondo.", None)
     notti = _cal_count_notti(ev["checkin"], ev["checkout"])
     riga_rim = ""
     if stato["pending_completions"]:
         riga_rim = f"\n\nℹ️ Restano {len(stato['pending_completions'])} prenotazion{'e' if len(stato['pending_completions']) == 1 else 'i'} da completare."
-    return (
+    msg = (
         f"✅ *Evento calendario salvato*\n\n"
         f"🏷️ Canale: {ev.get('canale','?').title()}\n"
         f"👤 {ev['nome']} ({ev['num_ospiti']} ospit{'e' if ev['num_ospiti']==1 else 'i'})\n"
@@ -4877,6 +5474,16 @@ def cal_complete_oldest_stub(testo_risposta):
         f"🔖 Cod. {ev.get('code','?')}"
         f"{riga_rim}"
     )
+    return (msg, key)
+
+
+def cal_set_culla(key, culla):
+    """Imposta il flag culla su un evento calendario. Ritorna True se salvato."""
+    eventi, sha_e = _cal_load_events()
+    if key not in eventi:
+        return False
+    eventi[key]["culla"] = bool(culla)
+    return _cal_save_events(eventi, sha_e)
 
 
 def cal_format_pending_list():
