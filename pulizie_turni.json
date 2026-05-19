@@ -13,5 +13,20 @@
     "confermato_at": null,
     "confermato_msg": "",
     "created_at": "2026-05-19T21:22:16"
+  },
+  "turno_20260519": {
+    "checkout": "19/05/2026",
+    "next_checkin": "19/05/2026",
+    "ospite_uscente": "",
+    "num_ospiti_uscenti": 0,
+    "culla_uscente": false,
+    "ospite_entrante": "Filippo",
+    "num_ospiti_entranti": 3,
+    "culla_entrante": true,
+    "inviato_subito_at": null,
+    "inviato_reminder_at": null,
+    "confermato_at": null,
+    "confermato_msg": "",
+    "created_at": "2026-05-19T21:22:18"
   }
 }
