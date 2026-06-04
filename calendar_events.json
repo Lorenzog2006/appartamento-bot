@@ -80,13 +80,13 @@
   "booking_1f82f17fa22e": {
     "canale": "booking",
     "code": "1f82f17fa22e",
-    "checkin": "04/06/2027",
+    "checkin": "05/06/2027",
     "checkout": "04/12/2027",
     "stato": "complete",
     "nome": "(Blocco Booking)",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "a4b8a2acca42879ae045dab50f6bc0c2@booking.com",
+    "ical_uid": "140c24d6c97f16b0699f2fb82b4cfa2c@booking.com",
     "created_at": "2026-05-19T20:40:09",
     "completed_at": "2026-05-19T22:45:34"
   },
