@@ -270,5 +270,29 @@
     "prezzo_eur": 0.0,
     "ical_uid": "3b13865fa51d21ed7db973c166f3a3dc@booking.com",
     "created_at": "2026-06-05T08:30:34"
+  },
+  "airbnb_HMQX32BPHD": {
+    "canale": "airbnb",
+    "code": "HMQX32BPHD",
+    "checkin": "07/06/2026",
+    "checkout": "09/06/2026",
+    "stato": "pending_details",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "1418fb94e984-37e6ef6a9622e7c492c82f62c84fc9c9@airbnb.com",
+    "created_at": "2026-06-06T19:00:37"
+  },
+  "booking_39d364bf8ef2": {
+    "canale": "booking",
+    "code": "39d364bf8ef2",
+    "checkin": "07/06/2026",
+    "checkout": "09/06/2026",
+    "stato": "pending_details",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "39d364bf8ef28b7ce7642cc8a4a27e83@booking.com",
+    "created_at": "2026-06-06T19:00:38"
   }
 }
