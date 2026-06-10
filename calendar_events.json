@@ -306,5 +306,17 @@
     "prezzo_eur": 0.0,
     "ical_uid": "7e49bb63236b32bb3a2bcaa03d00300a@booking.com",
     "created_at": "2026-06-08T14:30:33"
+  },
+  "airbnb_HMH8X4FFRJ": {
+    "canale": "airbnb",
+    "code": "HMH8X4FFRJ",
+    "checkin": "01/07/2026",
+    "checkout": "04/07/2026",
+    "stato": "pending_details",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "1418fb94e984-fdf0c78a2c6f8e7407d5a60860c52988@airbnb.com",
+    "created_at": "2026-06-10T17:30:30"
   }
 }
