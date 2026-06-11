@@ -5216,11 +5216,13 @@ def whatsapp_webhook():
             lingua_stat = rileva_lingua(testo)
             aggiorna_stats(testo, lingua_stat)
             aggiorna_daily_stats(testo, lingua_stat, wa_session_id)
-        except Exception:
-            pass
+        except Exception as e:
+            log_warn("wa_webhook", f"stats err: {type(e).__name__}: {str(e)[:200]}")
 
-    except Exception:
-        pass
+    except Exception as e:
+        import traceback as _tb
+        log_errore("wa_webhook_outer", f"{type(e).__name__}: {str(e)[:300]}")
+        log_warn("wa_webhook_outer", _tb.format_exc()[:1500])
 
     return "ok"
 
