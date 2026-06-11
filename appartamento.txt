@@ -278,8 +278,11 @@ Disponibile foto con parole chiave: keybox, locker, casella chiave, casier, boî
 Quale è il parcheggio ?: Il codice del lucchetto che tiene la catenella è 581
 # Aggiunto il 19/05/2026
 Where is the umbrella ?: Non abbiamo ombrelli a casa mi dispiace
+# Aggiunto il 11/06/2026
+Disponibile foto con parole chiave: keybox, keybox, coffre à clés, caja de llaves, schlüsselkasten — descrizione: La keybox si trova qui
 
 [MEDIA]
+keybox, keybox, coffre à clés, caja de llaves, schlüsselkasten = photo:AgACAgIAAxkBAAIEfGorDYCkzOy8hd4lI4sD8LKGC4sgAAIbH2sbZ65YSZr4aFtSQ7grAQADAgADeQADPAQ | La keybox si trova qui
 porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements = photo:AgACAgIAAxkBAAICxGn1CDrtnZgvf5Ljqo9TrGM3jMaHAALKFmsb-gOpS4bNde530A-pAQADAgADeQADOwQ | Questa la porta di ingresso dell'appartamento
 ingresso, entrance, entrée, entrada, eingang = photo:AgACAgIAAxkBAAICvWn1B_rwuLRvTk6sDtCJNO0F0Du4AALJFmsb-gOpS3mDFlBXEPGGAQADAgADeQADOwQ | Questo l'ingresso nello stabile
 posto auto, parking, parkplatz, stationnement, estacionamiento, aparcamiento = photo:AgACAgIAAxkBAAICtmn1B6XpVxsbEHXxGqK4etTWOAqLAALHFmsb-gOpSyZ8PBwW-D01AQADAgADeQADOwQ | Questo il posto auto dove parcheggiare
