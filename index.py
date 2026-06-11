@@ -5103,7 +5103,6 @@ def whatsapp_webhook():
             except Exception:
                 pass
 
-        log_info("wa_webhook", f"after_intercepts sid={wa_session_id} paused={is_paused(wa_session_id)} takeover={is_in_takeover(wa_session_id)}")
         # Pausa AI: notifica Lorenzo e basta, non rispondere
         if is_paused(wa_session_id):
             if OWNER_ID:
@@ -5135,9 +5134,7 @@ def whatsapp_webhook():
         # Risposta AI (riusa tutta la logica esistente)
         t_start_wa = datetime.now().timestamp()
         info  = leggi_info()
-        log_info("wa_webhook", f"calling chiedi_ai sid={wa_session_id}")
         reply = chiedi_ai(testo, info, chat_id=wa_session_id)
-        log_info("wa_webhook", f"chiedi_ai returned reply_len={len(reply) if reply else 0} preview={(reply or '')[:80]!r}")
         aggiorna_storia(wa_session_id, testo, reply)
         # Aggiorna anagrafica utente (per dashboard) + analytics
         try:
@@ -5154,9 +5151,7 @@ def whatsapp_webhook():
             pass
 
         # Invia risposta all'ospite su WhatsApp
-        log_info("wa_webhook", f"calling wa_invia to=...{wa_from[-4:]}")
         wa_invia(wa_from, reply)
-        log_info("wa_webhook", "wa_invia returned")
 
         # Media automatici (foto/video) — stessa logica di Telegram
         try:
