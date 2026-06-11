@@ -2,9 +2,9 @@
   "wa_393202599675": {
     "canale": "whatsapp",
     "primo_msg": "2026-05-10T12:25:22",
-    "totale_msg": 38,
+    "totale_msg": 39,
     "topic_count": {
-      "altro": 23,
+      "altro": 24,
       "wifi": 1,
       "check-in": 9,
       "parcheggio": 3,
@@ -12,7 +12,7 @@
     },
     "nome": "Lorenzo",
     "lingua": "italian",
-    "ultimo_msg": "2026-06-11T19:34:50",
+    "ultimo_msg": "2026-06-11T19:41:21",
     "in_takeover": false,
     "pausa_ai": false
   },
