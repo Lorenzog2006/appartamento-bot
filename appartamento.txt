@@ -280,7 +280,6 @@ Quale è il parcheggio ?: Il codice del lucchetto che tiene la catenella è 581
 Where is the umbrella ?: Non abbiamo ombrelli a casa mi dispiace
 
 [MEDIA]
-keybox, locker, casella chiave, casier, boîte à clés, casillero, schließfach = photo:AgACAgIAAxkBAAIDsmoEwjFcIoyqInpm3HRHZMwDKvolAAJbGWsbapAgSLI7qz6R8yg8AQADAgADeQADOwQ | La keybox si trova qui
 porta appartamento, apartment door, porte d'appartement, puerta de apartamento, tür des appartements = photo:AgACAgIAAxkBAAICxGn1CDrtnZgvf5Ljqo9TrGM3jMaHAALKFmsb-gOpS4bNde530A-pAQADAgADeQADOwQ | Questa la porta di ingresso dell'appartamento
 ingresso, entrance, entrée, entrada, eingang = photo:AgACAgIAAxkBAAICvWn1B_rwuLRvTk6sDtCJNO0F0Du4AALJFmsb-gOpS3mDFlBXEPGGAQADAgADeQADOwQ | Questo l'ingresso nello stabile
 posto auto, parking, parkplatz, stationnement, estacionamiento, aparcamiento = photo:AgACAgIAAxkBAAICtmn1B6XpVxsbEHXxGqK4etTWOAqLAALHFmsb-gOpSyZ8PBwW-D01AQADAgADeQADOwQ | Questo il posto auto dove parcheggiare
