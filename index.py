@@ -13,7 +13,7 @@ DASHBOARD_KEY  = (os.environ.get("DASHBOARD_KEY") or "").strip()
 
 WA_TOKEN        = (os.environ.get("WHATSAPP_TOKEN") or "").strip()
 WA_PHONE_ID     = (os.environ.get("WHATSAPP_PHONE_ID") or "").strip()
-WA_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "juanlespins2026").strip()
+WA_VERIFY_TOKEN = (os.environ.get("WHATSAPP_VERIFY_TOKEN") or "").strip()
 WA_PULIZIE      = (os.environ.get("WA_PULIZIE") or "").strip()  # numero WhatsApp signora pulizie (es: 393201234567)
 NOME_PULIZIE    = (os.environ.get("NOME_PULIZIE") or "Signora delle pulizie").strip()
 
@@ -50,6 +50,44 @@ _attesa_correzione_owner = {}
 _upload_media = {}
 # Flusso guidato creazione prenotazione manuale: OWNER_ID → {step, nome, checkin, checkout, lingua}
 _attesa_prenotazione = {}
+
+
+# ── Helper sicurezza/robustezza ───────────────────────────────────────────────
+def escape_md(s):
+    """Escape caratteri speciali Telegram parse_mode='Markdown' (legacy).
+    Markdown legacy interpreta solo: _ * ` [ — escapiamo questi."""
+    if s is None:
+        return ""
+    return (str(s)
+            .replace("\\", "\\\\")
+            .replace("_", "\\_")
+            .replace("*", "\\*")
+            .replace("`", "\\`")
+            .replace("[", "\\["))
+
+
+def urlopen_retry(req, timeout=10, retries=2, backoff=0.8):
+    """urlopen con retry su 5xx/timeout/network. Lascia passare 4xx (errori client)."""
+    import time as _t
+    last_exc = None
+    for i in range(retries + 1):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if 500 <= e.code < 600 and i < retries:
+                last_exc = e
+                _t.sleep(backoff * (2 ** i))
+                continue
+            raise
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            if i < retries:
+                last_exc = e
+                _t.sleep(backoff * (2 ** i))
+                continue
+            raise
+    if last_exc:
+        raise last_exc
+
 
 def _carica_conversazioni_da_github():
     """Carica conversazioni da GitHub. Best-effort, mai bloccante."""
@@ -915,12 +953,35 @@ def leggi_testo():
 def invalida_cache():
     _cache["ts"] = 0
 
+import sys as _sys
+
+
+def _log_stderr(livello, contesto, msg):
+    """Stampa su stderr (Vercel cattura nei logs). Best-effort, mai bloccante."""
+    try:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{ts}] [{livello}] [{contesto}] {msg}", file=_sys.stderr, flush=True)
+    except Exception:
+        pass
+
+
+def log_info(contesto, msg):
+    _log_stderr("INFO", contesto, msg)
+
+
+def log_warn(contesto, msg):
+    _log_stderr("WARN", contesto, msg)
+
+
 def log_errore(contesto, errore):
-    """Notifica Lorenzo via Telegram di un errore. Best-effort, mai bloccante."""
+    """Notifica Lorenzo via Telegram di un errore + stampa su stderr per i log Vercel."""
+    err_tipo = type(errore).__name__ if not isinstance(errore, str) else "Errore"
+    err_msg = str(errore)[:500]
+    _log_stderr("ERROR", contesto, f"{err_tipo}: {err_msg}")
     if not OWNER_ID or not TOKEN:
         return
     try:
-        msg = f"⚠️ Bot errore [{contesto}]: {type(errore).__name__}: {str(errore)[:300]}"
+        msg = f"⚠️ Bot errore [{contesto}]: {err_tipo}: {err_msg[:300]}"
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
         data = json.dumps({"chat_id": int(OWNER_ID), "text": msg}).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
@@ -1649,7 +1710,26 @@ def esegui_promemoria():
         oggi = datetime.now().date()
         domani = oggi + timedelta(days=1)
         ieri = oggi - timedelta(days=1)
-        cambiato = False
+
+        def _prenota_e_invia(chat_id, p, r, tipo, msg, nome):
+            # Idempotenza: marca PRIMA dell'invio e persisti, poi invia.
+            # Se l'invio fallisce, resetta il flag e persisti di nuovo per ritentare al prossimo cron.
+            r[tipo] = datetime.now().isoformat()
+            try:
+                salva_tutte_prenotazioni(prenotazioni)
+            except Exception:
+                # Se non riesco a persistere il "lock", evito di inviare per non rischiare doppi invii al prossimo cron
+                r[tipo] = None
+                return False
+            ok = _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria=tipo)
+            if not ok:
+                r[tipo] = None
+                try:
+                    salva_tutte_prenotazioni(prenotazioni)
+                except Exception:
+                    pass
+            return ok
+
         for chat_id, p in prenotazioni.items():
             try:
                 ci_d = datetime.strptime(p.get("checkin", ""), "%d/%m/%Y").date()
@@ -1662,41 +1742,31 @@ def esegui_promemoria():
             # PRE-ARRIVO (giorno prima)
             if ci_d == domani and not r.get("pre_arrivo"):
                 msg = PROMEMORIA_PRE_ARRIVO.get(lingua, PROMEMORIA_PRE_ARRIVO["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="pre_arrivo"):
-                    r["pre_arrivo"] = datetime.now().isoformat()
+                if _prenota_e_invia(chat_id, p, r, "pre_arrivo", msg, nome):
                     inviati["pre_arrivo"] += 1
-                    cambiato = True
                 else:
                     inviati["errori"] += 1
             # ARRIVO (giorno stesso)
             if ci_d == oggi and not r.get("arrivo"):
                 msg = PROMEMORIA_ARRIVO.get(lingua, PROMEMORIA_ARRIVO["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="arrivo"):
-                    r["arrivo"] = datetime.now().isoformat()
+                if _prenota_e_invia(chat_id, p, r, "arrivo", msg, nome):
                     inviati["arrivo"] += 1
-                    cambiato = True
                 else:
                     inviati["errori"] += 1
             # CHECK-OUT (giorno stesso)
             if co_d == oggi and not r.get("check_out"):
                 msg = PROMEMORIA_CHECKOUT.get(lingua, PROMEMORIA_CHECKOUT["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="check_out"):
-                    r["check_out"] = datetime.now().isoformat()
+                if _prenota_e_invia(chat_id, p, r, "check_out", msg, nome):
                     inviati["check_out"] += 1
-                    cambiato = True
                 else:
                     inviati["errori"] += 1
             # RECENSIONE (giorno dopo check-out)
             if co_d == ieri and not r.get("recensione"):
                 msg = PROMEMORIA_RECENSIONE.get(lingua, PROMEMORIA_RECENSIONE["english"]).format(nome=nome)
-                if _invia_a_cliente(chat_id, msg, nome_ospite=nome, tipo_promemoria="recensione"):
-                    r["recensione"] = datetime.now().isoformat()
+                if _prenota_e_invia(chat_id, p, r, "recensione", msg, nome):
                     inviati["recensione"] += 1
-                    cambiato = True
                 else:
                     inviati["errori"] += 1
-        if cambiato:
-            salva_tutte_prenotazioni(prenotazioni)
     except Exception as e:
         try:
             log_errore("cron_promemoria", e)
@@ -1949,8 +2019,25 @@ def telegram(metodo, payload):
     url = f"https://api.telegram.org/bot{TOKEN}/{metodo}"
     data = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    r = urllib.request.urlopen(req, timeout=10)
-    return json.loads(r.read())
+    try:
+        r = urlopen_retry(req, timeout=10, retries=2)
+        return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        # Telegram 400 spesso = Markdown rotto. Ritenta senza parse_mode come fallback.
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            body = ""
+        if e.code == 400 and payload.get("parse_mode") and "can't parse entities" in body.lower():
+            try:
+                payload2 = {k: v for k, v in payload.items() if k != "parse_mode"}
+                req2 = urllib.request.Request(url, data=json.dumps(payload2).encode(),
+                                              headers={"Content-Type": "application/json"})
+                r2 = urlopen_retry(req2, timeout=10, retries=1)
+                return json.loads(r2.read())
+            except Exception:
+                pass
+        raise
 
 def invia_messaggio(chat_id, testo, parse_mode=None, remove_kb=True):
     payload = {"chat_id": chat_id, "text": testo}
@@ -3619,6 +3706,14 @@ def webhook():
 @app.route("/daily-report", methods=["GET", "POST"])
 def daily_report():
     """Chiamato da Vercel Cron ogni sera alle 21:00 CET."""
+    cron_secret = os.environ.get("CRON_SECRET", "").strip()
+    if cron_secret:
+        if request.headers.get("Authorization") != f"Bearer {cron_secret}":
+            return ("Forbidden", 403)
+    else:
+        ua = request.headers.get("User-Agent", "").lower()
+        if "vercel" not in ua:
+            return ("Forbidden", 403)
     try:
         testo = formatta_daily_stats()
         invia_messaggio(int(OWNER_ID), testo, parse_mode="Markdown")
@@ -3629,6 +3724,8 @@ def daily_report():
 @app.route("/reset-keyboards")
 def reset_keyboards():
     """Rimuove la tastiera rapida da tutti gli utenti con prenotazione."""
+    if not DASHBOARD_KEY or request.args.get("key") != DASHBOARD_KEY:
+        return ("Forbidden", 403)
     try:
         prenotazioni, _ = carica_prenotazioni()
         count = 0
@@ -3645,17 +3742,16 @@ def reset_keyboards():
 @app.route("/cron/scheduled", methods=["GET", "POST"])
 def cron_scheduled():
     """Endpoint cron unificato. Eseguito ogni mattina. Decide cosa fare in base alla data."""
-    # Auth: Vercel cron arriva senza header speciale. Accettiamo o header CRON_SECRET o
-    # User-Agent vercel-cron (Vercel firma le sue cron call con questo).
-    auth_ok = False
+    # Auth: se CRON_SECRET è settato, è OBBLIGATORIO. Altrimenti accettiamo il fallback Vercel.
     cron_secret = os.environ.get("CRON_SECRET", "").strip()
-    if cron_secret and request.headers.get("Authorization") == f"Bearer {cron_secret}":
-        auth_ok = True
-    ua = request.headers.get("User-Agent", "").lower()
-    if "vercel" in ua:
-        auth_ok = True
-    if not auth_ok:
-        return ("Forbidden", 403)
+    if cron_secret:
+        if request.headers.get("Authorization") != f"Bearer {cron_secret}":
+            return ("Forbidden", 403)
+    else:
+        # Fallback: solo User-Agent vercel-cron (spoofabile, ma non c'è secret configurato).
+        ua = request.headers.get("User-Agent", "").lower()
+        if "vercel" not in ua:
+            return ("Forbidden", 403)
 
     risultato = {"promemoria": None, "report_mensile": None, "reminder_pulizie": None}
     # Sempre: esegui promemoria
@@ -4901,7 +4997,7 @@ def whatsapp_webhook():
         mode      = request.args.get("hub.mode")
         token     = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
-        if mode == "subscribe" and token == WA_VERIFY_TOKEN:
+        if mode == "subscribe" and WA_VERIFY_TOKEN and token == WA_VERIFY_TOKEN:
             return challenge, 200
         return "Unauthorized", 403
 
@@ -4910,13 +5006,21 @@ def whatsapp_webhook():
         body    = request.get_json(force=True)
         entry   = body.get("entry", [])
         if not entry:
+            log_info("wa_webhook", "no entry in body")
             return "ok"
         changes = entry[0].get("changes", [])
         if not changes:
+            log_info("wa_webhook", "no changes")
             return "ok"
         value    = changes[0].get("value", {})
         messages = value.get("messages", [])
+        statuses = value.get("statuses", [])
         if not messages:
+            if statuses:
+                st = statuses[0]
+                log_info("wa_webhook", f"status only: type={st.get('status')} recipient_masked=...{str(st.get('recipient_id',''))[-4:]}")
+            else:
+                log_info("wa_webhook", f"no messages no statuses, value_keys={list(value.keys())}")
             return "ok"
 
         msg = messages[0]
@@ -4924,6 +5028,7 @@ def whatsapp_webhook():
         wa_from = msg["from"]   # es. "393202599675" (senza +)
         contacts = value.get("contacts", [])
         nome = contacts[0]["profile"]["name"] if contacts else "Ospite"
+        log_info("wa_webhook", f"msg_in type={msg_type} from_masked=...{wa_from[-4:]} nome={nome}")
 
         # Audio/voice in arrivo → trascrivi e tratta come testo
         era_vocale = False
