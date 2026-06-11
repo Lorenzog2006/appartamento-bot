@@ -17,6 +17,15 @@ WA_VERIFY_TOKEN = (os.environ.get("WHATSAPP_VERIFY_TOKEN") or "").strip()
 WA_PULIZIE      = (os.environ.get("WA_PULIZIE") or "").strip()  # numero WhatsApp signora pulizie (es: 393201234567)
 NOME_PULIZIE    = (os.environ.get("NOME_PULIZIE") or "Signora delle pulizie").strip()
 
+# Coordinate appartamento (configurabili via env, default Juan les Pins centro)
+try:
+    APT_LAT = float(os.environ.get("APT_LAT", "43.5641"))
+    APT_LNG = float(os.environ.get("APT_LNG", "7.1175"))
+except Exception:
+    APT_LAT, APT_LNG = 43.5641, 7.1175
+APT_NAME    = (os.environ.get("APT_NAME") or "La Terrasse Bleue — Juan les Pins").strip()
+APT_ADDRESS = (os.environ.get("APT_ADDRESS") or "93 Bd Raymond Poincaré, 06160 Antibes").strip()
+
 REPO         = "Lorenzog2006/appartamento-bot"
 GITHUB_RAW   = f"https://raw.githubusercontent.com/{REPO}/main/appartamento.txt"
 GITHUB_API   = f"https://api.github.com/repos/{REPO}/contents/appartamento.txt"
@@ -5071,6 +5080,96 @@ def wa_invia(to, testo):
             pass
 
 
+_KEYWORDS_INDIRIZZO = [
+    # IT
+    "come arriv", "come si arriv", "indirizzo", "dove siete", "dove si trova", "dove sei",
+    "raggiungere", "raggiungerv", "come venire", "come ci arriv",
+    # EN
+    "how to reach", "how to get", "how do i get", "address", "where are you", "directions", "location of",
+    "how do i arrive", "where is it", "where is the apartment",
+    # FR
+    "adresse", "comment arriver", "comment venir", "où êtes-vous", "comment vous rejoindre",
+    # ES
+    "dirección", "direccion", "cómo llegar", "como llegar", "dónde están",
+    # DE
+    "wie komme ich", "wie erreiche ich", "wo befindet ihr",
+]
+
+
+def e_richiesta_indirizzo(testo):
+    if not testo:
+        return False
+    t = testo.lower()
+    return any(k in t for k in _KEYWORDS_INDIRIZZO)
+
+
+def _wa_send(payload, label="wa"):
+    """POST helper su Cloud API messages endpoint. Best-effort. Ritorna response dict o None."""
+    try:
+        url = f"https://graph.facebook.com/v18.0/{WA_PHONE_ID}/messages"
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {WA_TOKEN}"
+        })
+        r = urllib.request.urlopen(req, timeout=10)
+        return json.loads(r.read())
+    except Exception as e:
+        try:
+            log_warn(label, f"wa send err: {type(e).__name__}: {str(e)[:200]}")
+        except Exception:
+            pass
+        return None
+
+
+def wa_invia_bottoni(to, body, bottoni, header=None):
+    """Invia messaggio interattivo con quick-reply buttons (max 3).
+    bottoni: lista di dict {'id': '...', 'title': 'Label max 20 char'}.
+    body: testo principale. header: opzionale, testo breve sopra."""
+    btns = [{"type": "reply", "reply": {"id": b["id"], "title": b["title"][:20]}}
+            for b in bottoni[:3]]
+    interactive = {
+        "type": "button",
+        "body": {"text": body[:1024]},
+        "action": {"buttons": btns},
+    }
+    if header:
+        interactive["header"] = {"type": "text", "text": header[:60]}
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "interactive",
+        "interactive": interactive,
+    }
+    return _wa_send(payload, label="wa_buttons")
+
+
+def wa_invia_location(to, latitude, longitude, name="", address=""):
+    """Invia un pin location nativo. Si apre direttamente in Maps su mobile."""
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "location",
+        "location": {
+            "latitude": float(latitude),
+            "longitude": float(longitude),
+            "name": (name or "")[:60],
+            "address": (address or "")[:200],
+        },
+    }
+    return _wa_send(payload, label="wa_location")
+
+
+def wa_reaction(to, message_id, emoji="👀"):
+    """Reagisce al messaggio dell'ospite con un emoji. Per togliere la reaction: emoji=''."""
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "reaction",
+        "reaction": {"message_id": message_id, "emoji": emoji},
+    }
+    return _wa_send(payload, label="wa_reaction")
+
+
 def wa_invia_template(to, template_name, nome_ospite, lingua_code="it"):
     """Invia un template WhatsApp approvato da Meta. Ritorna True se 200 OK.
     nome_ospite va nel componente body come variabile named `nome_ospite`."""
@@ -5196,6 +5295,106 @@ def wa_invia_media(to, telegram_file_id, tipo, caption=""):
         return False
 
 
+def _telegram_multipart(metodo, fields_text, file_field=None, file_bytes=None, file_name="upload.bin", mime="application/octet-stream"):
+    """POST multipart a Telegram API. fields_text: dict di campi testo.
+    Se file_field/file_bytes presenti, aggiunge l'upload del file. Best-effort."""
+    try:
+        boundary = "----WaFwd" + hex(int(datetime.now().timestamp() * 1000))[2:]
+        sep = f"--{boundary}\r\n".encode()
+        end = f"--{boundary}--\r\n".encode()
+        parts = []
+        for k, v in fields_text.items():
+            parts.append(sep)
+            parts.append(f'Content-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+        if file_field and file_bytes:
+            parts.append(sep)
+            parts.append(
+                f'Content-Disposition: form-data; name="{file_field}"; filename="{file_name}"\r\n'
+                f'Content-Type: {mime}\r\n\r\n'.encode()
+            )
+            parts.append(file_bytes)
+            parts.append(b"\r\n")
+        parts.append(end)
+        body_data = b"".join(parts)
+        url = f"https://api.telegram.org/bot{TOKEN}/{metodo}"
+        req = urllib.request.Request(url, data=body_data, headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}"
+        })
+        urllib.request.urlopen(req, timeout=30)
+        return True
+    except Exception as e:
+        try:
+            log_warn("tg_multipart", f"{metodo} err: {type(e).__name__}: {str(e)[:200]}")
+        except Exception:
+            pass
+        return False
+
+
+def inoltra_media_wa_a_owner(wa_type, media_obj, wa_from, nome, caption_wa=""):
+    """Scarica un media da WhatsApp e lo inoltra all'OWNER su Telegram.
+    wa_type: 'image' | 'video' | 'document'."""
+    if not OWNER_ID:
+        return
+    media_id = media_obj.get("id") if isinstance(media_obj, dict) else None
+    if not media_id:
+        return
+    data, mime = scarica_wa_media(media_id)
+    if not data:
+        # Fallback: solo notifica testuale
+        try:
+            invia_messaggio(int(OWNER_ID),
+                f"📎 *{wa_type.upper()}* da {nome} [WA:{wa_from}]\n_(download fallito)_",
+                parse_mode="Markdown")
+        except Exception:
+            pass
+        return
+    caption_finale = f"📎 {wa_type.upper()} da {nome} [WA:{wa_from}]"
+    if caption_wa:
+        caption_finale += f"\n💬 {caption_wa[:600]}"
+    if wa_type == "image":
+        ext = "jpg" if (mime or "").endswith("jpeg") else (mime or "image/jpeg").split("/")[-1]
+        _telegram_multipart("sendPhoto",
+            {"chat_id": str(OWNER_ID), "caption": caption_finale},
+            file_field="photo", file_bytes=data,
+            file_name=f"wa_{wa_from}.{ext}", mime=mime or "image/jpeg")
+    elif wa_type == "video":
+        ext = (mime or "video/mp4").split("/")[-1]
+        _telegram_multipart("sendVideo",
+            {"chat_id": str(OWNER_ID), "caption": caption_finale},
+            file_field="video", file_bytes=data,
+            file_name=f"wa_{wa_from}.{ext}", mime=mime or "video/mp4")
+    else:  # document
+        filename = (media_obj.get("filename") or f"wa_{wa_from}").replace('"', "")
+        _telegram_multipart("sendDocument",
+            {"chat_id": str(OWNER_ID), "caption": caption_finale},
+            file_field="document", file_bytes=data,
+            file_name=filename, mime=mime or "application/octet-stream")
+
+
+def inoltra_location_wa_a_owner(lat, lng, name_loc, address_loc, wa_from, nome):
+    """Inoltra una posizione WhatsApp a Lorenzo su Telegram come sendLocation + descrizione testuale."""
+    if not OWNER_ID:
+        return
+    try:
+        telegram("sendLocation", {
+            "chat_id": int(OWNER_ID),
+            "latitude": float(lat),
+            "longitude": float(lng),
+        })
+        descr = f"📍 *Posizione condivisa* da {nome} [WA:{wa_from}]"
+        if name_loc:
+            descr += f"\n🏷️ {name_loc}"
+        if address_loc:
+            descr += f"\n📮 {address_loc}"
+        descr += f"\n🗺️ https://maps.google.com/?q={lat},{lng}"
+        invia_messaggio(int(OWNER_ID), descr, parse_mode="Markdown")
+    except Exception as e:
+        try:
+            log_warn("inoltra_location", str(e)[:200])
+        except Exception:
+            pass
+
+
 # ── WhatsApp webhook ──────────────────────────────────────────────────────────
 @app.route("/whatsapp", methods=["GET", "POST"])
 def whatsapp_webhook():
@@ -5232,10 +5431,18 @@ def whatsapp_webhook():
 
         msg = messages[0]
         msg_type = msg.get("type")
+        msg_id_wa = msg.get("id", "")
         wa_from = msg["from"]   # es. "393202599675" (senza +)
         contacts = value.get("contacts", [])
         nome = contacts[0]["profile"]["name"] if contacts else "Ospite"
         log_info("wa_webhook", f"msg_in type={msg_type} from_masked=...{wa_from[-4:]} nome={nome}")
+
+        # Reaction 👀 per feedback immediato che il bot ha ricevuto (best-effort)
+        if msg_id_wa and msg_type in ("text", "audio", "interactive", "image", "video", "document"):
+            try:
+                wa_reaction(wa_from, msg_id_wa, "👀")
+            except Exception:
+                pass
 
         # Audio/voice in arrivo → trascrivi e tratta come testo
         era_vocale = False
@@ -5257,9 +5464,49 @@ def whatsapp_webhook():
             else:
                 wa_invia(wa_from, "Mi dispiace, non sono riuscito a ricevere l'audio 🙏")
                 return "ok"
+        elif msg_type == "image":
+            inoltra_media_wa_a_owner("image", msg.get("image", {}), wa_from, nome,
+                                     caption_wa=(msg.get("image", {}) or {}).get("caption", ""))
+            wa_invia(wa_from, "📸 Foto ricevuta, l'ho inoltrata a Lorenzo che ti risponderà a breve!")
+            return "ok"
+        elif msg_type == "video":
+            inoltra_media_wa_a_owner("video", msg.get("video", {}), wa_from, nome,
+                                     caption_wa=(msg.get("video", {}) or {}).get("caption", ""))
+            wa_invia(wa_from, "🎬 Video ricevuto, l'ho inoltrato a Lorenzo che ti risponderà a breve!")
+            return "ok"
+        elif msg_type == "document":
+            inoltra_media_wa_a_owner("document", msg.get("document", {}), wa_from, nome,
+                                     caption_wa=(msg.get("document", {}) or {}).get("caption", ""))
+            wa_invia(wa_from, "📎 Documento ricevuto, l'ho inoltrato a Lorenzo!")
+            return "ok"
+        elif msg_type == "location":
+            loc = msg.get("location", {}) or {}
+            try:
+                inoltra_location_wa_a_owner(
+                    loc.get("latitude"), loc.get("longitude"),
+                    loc.get("name", ""), loc.get("address", ""),
+                    wa_from, nome
+                )
+            except Exception:
+                pass
+            wa_invia(wa_from, "📍 Posizione ricevuta, inoltrata a Lorenzo!")
+            return "ok"
+        elif msg_type == "interactive":
+            # Click su un quick-reply button: estraiamo il payload e lo trasformiamo in testo
+            interactive = msg.get("interactive", {}) or {}
+            br = interactive.get("button_reply") or interactive.get("list_reply") or {}
+            btn_id = br.get("id", "")
+            btn_title = br.get("title", "")
+            # Mappa id bottone → testo equivalente per il bot
+            QR_MAP = {
+                "qr_arrivare": "Come arrivo all'appartamento?",
+                "qr_checkin": "Come funziona il check-in?",
+                "qr_wifi": "Come mi collego al WiFi?",
+            }
+            testo = QR_MAP.get(btn_id, btn_title or "ciao")
         elif msg_type != "text":
-            # Altri tipi (image, video, document, sticker, location...) non gestiti per ora
-            wa_invia(wa_from, "Ciao! 😊 Al momento gestisco solo testo e messaggi vocali. Scrivi o registra pure la tua domanda!")
+            # Sticker, contact, ecc. — non gestiti
+            wa_invia(wa_from, "Ciao! 😊 Al momento gestisco testo, audio, foto, video e posizioni. Scrivi pure la tua domanda!")
             return "ok"
         else:
             testo = msg["text"]["body"]
@@ -5328,13 +5575,32 @@ def whatsapp_webhook():
                 pass
             return "ok"
 
-        # Primo messaggio → invia benvenuto prima della risposta AI
+        # Primo messaggio → invia benvenuto + pulsanti quick-reply prima della risposta AI
         storia_wa = get_storia(wa_session_id)
         if not storia_wa:
             try:
                 lingua    = rileva_lingua(testo)
                 benvenuto = genera_benvenuto(lingua, leggi_info())
                 wa_invia(wa_from, benvenuto)
+                # Pulsanti quick-reply: argomenti più richiesti
+                QR_TITLES = {
+                    "italian":    [("qr_arrivare","📍 Come arrivare"), ("qr_checkin","🔑 Check-in"), ("qr_wifi","📶 WiFi")],
+                    "english":    [("qr_arrivare","📍 Directions"),    ("qr_checkin","🔑 Check-in"), ("qr_wifi","📶 WiFi")],
+                    "french":     [("qr_arrivare","📍 Arriver"),       ("qr_checkin","🔑 Check-in"), ("qr_wifi","📶 WiFi")],
+                    "spanish":    [("qr_arrivare","📍 Cómo llegar"),   ("qr_checkin","🔑 Check-in"), ("qr_wifi","📶 WiFi")],
+                    "german":     [("qr_arrivare","📍 Anreise"),       ("qr_checkin","🔑 Check-in"), ("qr_wifi","📶 WiFi")],
+                }
+                QR_PROMPT = {
+                    "italian": "💡 Posso aiutarti subito con:",
+                    "english": "💡 I can help you right away with:",
+                    "french":  "💡 Je peux t'aider tout de suite avec:",
+                    "spanish": "💡 Puedo ayudarte enseguida con:",
+                    "german":  "💡 Ich kann dir sofort helfen mit:",
+                }
+                titles = QR_TITLES.get(lingua, QR_TITLES["english"])
+                wa_invia_bottoni(wa_from,
+                    QR_PROMPT.get(lingua, QR_PROMPT["english"]),
+                    [{"id": i, "title": t} for i, t in titles])
             except Exception:
                 wa_invia(wa_from, "Benvenuto! 😊 Sono l'assistente virtuale dell'appartamento. Come posso aiutarti?")
 
@@ -5359,6 +5625,13 @@ def whatsapp_webhook():
 
         # Invia risposta all'ospite su WhatsApp
         wa_invia(wa_from, reply)
+
+        # Se l'ospite ha chiesto come arrivare/indirizzo → manda anche il pin location
+        try:
+            if e_richiesta_indirizzo(testo):
+                wa_invia_location(wa_from, APT_LAT, APT_LNG, APT_NAME, APT_ADDRESS)
+        except Exception:
+            pass
 
         # Media automatici (foto/video) — stessa logica di Telegram
         try:
