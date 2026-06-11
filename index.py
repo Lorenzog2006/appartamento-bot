@@ -51,6 +51,10 @@ _upload_media = {}
 # Flusso guidato creazione prenotazione manuale: OWNER_ID → {step, nome, checkin, checkout, lingua}
 _attesa_prenotazione = {}
 
+# Aggregazione notifiche stesso ospite: chat_id_ospite (str) → {msg_id, testo, ts, bottoni}
+_ultima_notif_ospite = {}
+_NOTIF_AGGREGA_SEC = 120
+
 
 # ── Helper sicurezza/robustezza ───────────────────────────────────────────────
 def escape_md(s):
@@ -1169,6 +1173,43 @@ def riorganizza_con_claude(testo_attuale, nuova_info):
 
 
 # ── GitHub: Q&A ──────────────────────────────────────────────────────────────
+def _autosalva_qa(owner_chat_id, testo_originale, risposta_lorenzo):
+    """Estrae la domanda originale dalla notifica, salva auto la Q&A in memoria
+    e notifica Lorenzo del risultato. Per correggere errori: edita appartamento.txt su GitHub."""
+    match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
+    if not match_domanda:
+        match_domanda = re.search(r'❓ (.+?)(?:\n|$)', testo_originale)
+    if not match_domanda:
+        return
+    domanda = match_domanda.group(1).strip()
+    try:
+        msg = invia_messaggio_get(owner_chat_id, f"💾 Salvataggio in memoria...\n\nD: {domanda}\nR: {risposta_lorenzo}")
+        msg_id = (msg or {}).get("result", {}).get("message_id")
+        salvato = salva_su_github(domanda, risposta_lorenzo)
+        if msg_id:
+            if salvato:
+                modifica_messaggio(owner_chat_id, msg_id,
+                    f"✅ *Salvato in memoria!*\n\nD: {domanda}\nR: {risposta_lorenzo}\n\n"
+                    f"_Per correggere/rimuovere: edita appartamento.txt su GitHub._",
+                    parse_mode="Markdown")
+            else:
+                modifica_messaggio(owner_chat_id, msg_id,
+                    f"❌ Errore nel salvataggio in memoria.\n\nD: {domanda}\nR: {risposta_lorenzo}")
+    except Exception:
+        pass
+
+
+def invia_messaggio_get(chat_id, testo, parse_mode=None):
+    """Come invia_messaggio ma ritorna la risposta Telegram (per ottenere il message_id)."""
+    payload = {"chat_id": chat_id, "text": testo}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    try:
+        return telegram("sendMessage", payload)
+    except Exception:
+        return None
+
+
 def salva_su_github(domanda, risposta):
     if not GITHUB_TOKEN:
         return False
@@ -2057,6 +2098,43 @@ def invia_bottoni(chat_id, testo, bottoni, parse_mode=None):
         payload["parse_mode"] = parse_mode
     telegram("sendMessage", payload)
 
+
+def notifica_owner_aggregata(chat_id_ospite, testo, bottoni, parse_mode="Markdown"):
+    """Manda una notifica all'OWNER ma se ce n'è una recente (<NOTIF_AGGREGA_SEC) per
+    lo stesso ospite, modifica quella appendendo il nuovo Q&A. Riduce lo spam quando
+    un ospite manda più messaggi di seguito. Best-effort, mai bloccante."""
+    if not OWNER_ID:
+        return
+    try:
+        now = datetime.now().timestamp()
+        key = str(chat_id_ospite)
+        rec = _ultima_notif_ospite.get(key)
+        if rec and (now - rec.get("ts", 0)) < _NOTIF_AGGREGA_SEC:
+            # Modifica notifica precedente appendendo
+            sep = "\n\n— — —\n\n"
+            nuovo_testo = (rec.get("testo", "") + sep + testo)[-3900:]
+            try:
+                modifica_messaggio(int(OWNER_ID), rec["msg_id"], nuovo_testo,
+                                   parse_mode=parse_mode, bottoni=bottoni)
+                _ultima_notif_ospite[key] = {"msg_id": rec["msg_id"], "testo": nuovo_testo, "ts": now}
+                return
+            except Exception:
+                pass  # fallback a notifica nuova
+        # Notifica nuova
+        payload = {
+            "chat_id": int(OWNER_ID),
+            "text": testo,
+            "reply_markup": {"inline_keyboard": bottoni} if bottoni else None,
+        }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        r = telegram("sendMessage", payload)
+        msg_id = (r or {}).get("result", {}).get("message_id")
+        if msg_id:
+            _ultima_notif_ospite[key] = {"msg_id": msg_id, "testo": testo, "ts": now}
+    except Exception:
+        pass
+
 def modifica_messaggio(chat_id, message_id, testo, parse_mode=None, bottoni=None):
     try:
         payload = {
@@ -2866,6 +2944,19 @@ def webhook():
                 # Rimuove i bottoni (nessuno più necessario)
                 modifica_messaggio(cb_chat_id, cb_msg_id, cb_testo + suffisso, parse_mode="Markdown", bottoni=[])
 
+            elif cb_data.startswith("REPLY:"):
+                # Bottone "Rispondi qui": apre una compose con force_reply.
+                # target_tag esempi: "ID:12345" o "WA:393201234567"
+                target_tag = cb_data.split(":", 1)[1]
+                # Estrai nome ospite dal testo originale per personalizzare il prompt
+                m_nome = re.search(r'Ospite:\s*([^\n\[]+)', cb_testo) or re.search(r'\*([^*\n]+)\*', cb_testo)
+                nome_ospite = (m_nome.group(1).strip() if m_nome else "ospite").strip()[:40]
+                telegram("sendMessage", {
+                    "chat_id": cb_chat_id,
+                    "text": f"✏️ Scrivi qui la risposta per {nome_ospite} [{target_tag}]",
+                    "reply_markup": {"force_reply": True, "input_field_placeholder": f"Risposta per {nome_ospite}..."}
+                })
+
             return "ok"
 
         # ── Messaggi normali ────────────────────────────────────────────────
@@ -2898,7 +2989,7 @@ def webhook():
                     invia_messaggio(chat_id, "Mi dispiace, non sono riuscito a capire l'audio 🙏 Puoi scrivermi a testo?")
                     return "ok"
 
-        # ── Proprietario invia foto/video → avvia flusso guidato ──
+        # ── Proprietario invia foto/video → caption=upload one-shot, senza caption=wizard ──
         if is_owner and not testo:
             try:
                 foto  = message.get("photo")
@@ -2912,12 +3003,44 @@ def webhook():
                     file_id, tipo = doc["file_id"], "photo"
                 else:
                     return "ok"
+
+                # ── 1-step: caption presente con formato "keywords | descrizione" ──
+                caption_in = (message.get("caption") or "").strip()
+                if caption_in:
+                    if "|" in caption_in:
+                        kw_it, descrizione = [p.strip() for p in caption_in.split("|", 1)]
+                    else:
+                        kw_it, descrizione = caption_in, ""
+                    if not kw_it:
+                        invia_messaggio(chat_id,
+                            "❌ Caption vuota. Riprova col formato:\n`spiaggia, mare | Yolo Plage a 5 min`",
+                            parse_mode="Markdown")
+                        return "ok"
+                    invia_messaggio(chat_id, "🌍 Traduco le parole chiave...")
+                    keywords_complete = traduci_keywords(kw_it) or kw_it
+                    salvato = salva_media_su_github(keywords_complete, tipo, file_id, descrizione)
+                    if salvato:
+                        invia_messaggio(chat_id,
+                            f"✅ *Media salvato!*\n\n"
+                            f"🔑 Parole chiave: `{keywords_complete}`\n"
+                            f"💬 Descrizione: {descrizione or '_(nessuna)_'}\n\n"
+                            f"Da ora rispondo automaticamente con questo media.",
+                            parse_mode="Markdown")
+                    else:
+                        invia_messaggio(chat_id, "❌ Errore nel salvataggio. Riprova.")
+                    return "ok"
+
+                # ── Wizard 3-step: nessuna caption, comportamento classico ──
                 _upload_media[str(chat_id)] = {"file_id": file_id, "tipo": tipo, "step": "keywords"}
                 invia_messaggio(chat_id,
-                    f"📸 {'Foto' if tipo == 'photo' else 'Video'} ricevuto! Procediamo passo per passo.\n\n"
-                    f"1️⃣ Scrivi le *parole chiave* che attiveranno questo media.\n"
-                    f"Separale con una virgola — scrivi in tutte le lingue dei tuoi ospiti.\n\n"
-                    f"Esempio:\n`box, garage, parcheggio, parking, park`"
+                    f"📸 {'Foto' if tipo == 'photo' else 'Video'} ricevuto!\n\n"
+                    f"💡 *Suggerimento:* la prossima volta puoi mandare la foto direttamente con caption:\n"
+                    f"`spiaggia, mare | Yolo Plage a 5 min`\n\n"
+                    f"Per ora procediamo passo passo.\n\n"
+                    f"1️⃣ Scrivi le *parole chiave* che attiveranno questo media (in italiano, le altre lingue le aggiungo io).\n"
+                    f"Separale con virgola.\n\n"
+                    f"Esempio:\n`spiaggia, mare, lettini`",
+                    parse_mode="Markdown"
                 )
             except Exception as e:
                 invia_messaggio(chat_id, f"Errore: {e}")
@@ -2988,19 +3111,8 @@ def webhook():
                     )
                 else:
                     invia_messaggio(chat_id, f"✅ Risposta inviata su WhatsApp a +{wa_numero}!{nota_trad}", parse_mode="Markdown")
-                # Offri di salvare in memoria
-                match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
-                if not match_domanda:
-                    match_domanda = re.search(r'❓ (.+?)(?:\n|$)', testo_originale)
-                if match_domanda:
-                    domanda_originale = match_domanda.group(1).strip()
-                    invia_bottoni(chat_id,
-                        f"💾 Vuoi salvare questa risposta nella memoria del bot?\n\nD: {domanda_originale}\nR: {testo}",
-                        [[
-                            {"text": "✅ Sì, salva", "callback_data": "SALVA"},
-                            {"text": "❌ No",         "callback_data": "NO"}
-                        ]]
-                    )
+                # Salva automaticamente in memoria (no bottone)
+                _autosalva_qa(chat_id, testo_originale, testo)
                 return "ok"
             if match_id:
                 id_ospite = int(match_id.group(1))
@@ -3030,19 +3142,8 @@ def webhook():
                     )
                 else:
                     invia_messaggio(chat_id, f"✅ Risposta inviata all'ospite!{nota_trad}", parse_mode="Markdown")
-                # Estrae la domanda sia dal formato ❓ "testo" che da ❓ testo
-                match_domanda = re.search(r'❓ "(.+?)"', testo_originale, re.DOTALL)
-                if not match_domanda:
-                    match_domanda = re.search(r'❓ (.+?)(?:\n|$)', testo_originale)
-                if match_domanda:
-                    domanda_originale = match_domanda.group(1).strip()
-                    invia_bottoni(chat_id,
-                        f"💾 Vuoi salvare questa risposta nella memoria del bot?\n\nD: {domanda_originale}\nR: {testo}",
-                        [[
-                            {"text": "✅ Sì, salva", "callback_data": "SALVA"},
-                            {"text": "❌ No",         "callback_data": "NO"}
-                        ]]
-                    )
+                # Salva automaticamente in memoria (no bottone)
+                _autosalva_qa(chat_id, testo_originale, testo)
                 return "ok"
             # Reply ma né WA né ID trovati nel messaggio originale → avvisa Lorenzo
             # (così non cade nella AI sull'owner)
@@ -3154,6 +3255,36 @@ def webhook():
             )
             return "ok"
 
+        # ── /menu — Lista comandi owner ──
+        if (testo == "/menu" or testo == "/help") and is_owner:
+            invia_messaggio(chat_id,
+                "🎛️ *Menu comandi*\n\n"
+                "*Gestione ospiti*\n"
+                "• `/pausa <id>` — disattiva AI per un cliente\n"
+                "• `/riprendi <id>` — riattiva AI\n"
+                "• `/rispondi <id> <testo>` — invia msg diretto a un ospite\n\n"
+                "*Prenotazioni*\n"
+                "• `/prenotazione` — nuova prenotazione (one-shot o wizard)\n"
+                "• `/prenotazioni` — lista prenotazioni attive\n"
+                "• `/annulla` — annulla wizard in corso\n\n"
+                "*Calendario & sync*\n"
+                "• `/cal` — stub iCal da completare\n"
+                "• `/calendario` — link al feed iCal unificato\n"
+                "• `/calsync` — sync manuale Airbnb+Booking\n\n"
+                "*Pulizie*\n"
+                "• `/pulizie` — gestione turni signora pulizie\n\n"
+                "*Stats & dashboard*\n"
+                "• `/stats` — statistiche oggi\n"
+                "• `/dashboard` — link dashboard web\n"
+                "• `/listamedia` — lista foto/video caricati\n\n"
+                "*Auto-apprendimento*\n"
+                "• Rispondi (reply) a una notifica ⚠️ → bot salva auto in memoria\n"
+                "• Manda foto/video con caption italiana → salvataggio auto multilingua\n"
+                "• [✏️ Modifica memoria bot su GitHub](https://github.com/Lorenzog2006/appartamento-bot/edit/main/appartamento.txt) (per correggere/rimuovere)",
+                parse_mode="Markdown"
+            )
+            return "ok"
+
         # ── /pausa <chat_id> ── disattiva AI per un cliente ──
         if testo.startswith("/pausa") and is_owner:
             parti = testo.split(" ", 1)
@@ -3231,7 +3362,78 @@ def webhook():
                 return "ok"
 
         # ── /prenotazione ── wizard per aggiungere prenotazione manualmente ──
-        if testo == "/prenotazione" and is_owner:
+        if testo.startswith("/prenotazione") and is_owner:
+            parti = testo.split(" ", 1)
+            arg = parti[1].strip() if len(parti) > 1 else ""
+            # ── /prenotazione one-shot: parse libero ──
+            # Esempi:
+            #   /prenotazione Mario 12/06-19/06 italian
+            #   /prenotazione Anna Bianchi 15/06/2026 - 22/06/2026 french wa 393201234567
+            if arg:
+                ci_oneshot, co_oneshot = estrai_date(arg)
+                lingue_map = {
+                    "italian":"italian","italiano":"italian","it":"italian",
+                    "english":"english","inglese":"english","en":"english",
+                    "french":"french","francese":"french","fr":"french",
+                    "spanish":"spanish","spagnolo":"spanish","es":"spanish",
+                    "german":"german","tedesco":"german","de":"german",
+                }
+                lingua_match = None
+                token_lingua = ""
+                for tok in re.findall(r"[A-Za-z]+", arg.lower()):
+                    if tok in lingue_map:
+                        lingua_match = lingue_map[tok]
+                        token_lingua = tok
+                        break
+                # contatto opzionale: "wa <num>" o "tg <id>"
+                contatto_match = re.search(r"\b(wa|tg)\s+(\d{4,})", arg.lower())
+                chat_id_finale = None
+                canale = None
+                if contatto_match:
+                    if contatto_match.group(1) == "wa":
+                        chat_id_finale = f"wa_{contatto_match.group(2)}"
+                        canale = "whatsapp"
+                    else:
+                        chat_id_finale = contatto_match.group(2)
+                        canale = "telegram"
+                # nome: tutto prima della prima data
+                nome = ""
+                if ci_oneshot:
+                    m_first_date = re.search(r"\d{1,2}/\d{1,2}", arg)
+                    if m_first_date:
+                        nome = arg[:m_first_date.start()].strip(" -,:")
+                if ci_oneshot and co_oneshot and nome:
+                    lingua = lingua_match or "italian"
+                    if not chat_id_finale:
+                        chat_id_finale = f"manual_{int(datetime.now().timestamp())}"
+                    ok = salva_prenotazione(chat_id_finale, nome, ci_oneshot, co_oneshot, lingua, num_ospiti=2, culla=False)
+                    if ok:
+                        riga_canale = (f"📱 *{canale.title()}*: `{chat_id_finale}`\n✅ Promemoria automatici attivi."
+                                       if canale else "ℹ️ _Nessun canale: niente promemoria automatici._")
+                        invia_messaggio(chat_id,
+                            f"✅ *Prenotazione salvata!*\n\n"
+                            f"👤 {nome}\n"
+                            f"📅 {ci_oneshot} → {co_oneshot}\n"
+                            f"🌍 Lingua: {lingua}\n"
+                            f"👥 Ospiti: 2 (default) — culla: no (default)\n\n"
+                            f"{riga_canale}\n\n"
+                            f"_Per modificare numero ospiti/culla usa /prenotazione (wizard)._",
+                            parse_mode="Markdown"
+                        )
+                        try:
+                            pulizie_trigger_da_prenotazione(nome, ci_oneshot, co_oneshot, 2, False)
+                        except Exception:
+                            pass
+                    else:
+                        invia_messaggio(chat_id, "❌ Errore salvataggio. Riprova col wizard: `/prenotazione`", parse_mode="Markdown")
+                    return "ok"
+                # Parsing incompleto → mostra formato e avvia wizard
+                invia_messaggio(chat_id,
+                    "⚠️ Non riesco a leggere tutti i dati. Avvio il wizard guidato.\n\n"
+                    "💡 *Formato one-shot:* `/prenotazione Mario 12/06-19/06 italian [wa 393...]`",
+                    parse_mode="Markdown"
+                )
+            # ── Wizard step-by-step ──
             wizard_pren_set(chat_id, {"step": "nome"})
             invia_messaggio(chat_id,
                 "📅 *Nuova prenotazione* — passo 1/6\n\n"
@@ -3646,12 +3848,13 @@ def webhook():
                 elif e_arrabbiato:
                     invia_bottoni(int(OWNER_ID),
                         f"🚨 *ATTENZIONE — OSPITE ARRABBIATO*\n\n"
-                        f"Tono frustrato/aggressivo rilevato.\n\n"
                         f"Ospite: {nome_display} [ID:{chat_id}]\n\n"
                         f"❓ {_domanda_per_owner(_voce_md, testo, italic=True)}\n\n"
-                        f"🤖 {reply}\n\n"
-                        f"💡 Suggerimento: rispondi tu di persona. Premi *Rispondi* o usa /pausa.",
-                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]],
+                        f"🤖 {reply}",
+                        [[
+                            {"text": "💬 Rispondi qui", "callback_data": f"REPLY:ID:{chat_id}"},
+                            {"text": "⏸️ Pausa", "callback_data": f"PAUSA:{chat_id}"}
+                        ]],
                         parse_mode="Markdown"
                     )
                 elif e_insoddisfatto:
@@ -3659,16 +3862,19 @@ def webhook():
                         f"😤 OSPITE INSODDISFATTO\n\n"
                         f"Ospite: {nome_display} [ID:{chat_id}]\n\n"
                         f"❓ {_q}\n\n"
-                        f"🤖 {reply}\n\n"
-                        f"👆 Premi Rispondi per contattarlo direttamente.",
-                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}]]
+                        f"🤖 {reply}",
+                        [[
+                            {"text": "💬 Rispondi qui", "callback_data": f"REPLY:ID:{chat_id}"},
+                            {"text": "⏸️ Pausa", "callback_data": f"PAUSA:{chat_id}"}
+                        ]]
                     )
                 else:
-                    invia_bottoni(int(OWNER_ID),
+                    notifica_owner_aggregata(chat_id,
                         f"📩 {nome_display} [ID:{chat_id}]\n\n❓ {_q_md}\n\n🤖 {reply}",
                         [[
+                            {"text": "💬 Rispondi qui", "callback_data": f"REPLY:ID:{chat_id}"},
                             {"text": "💬 Prendi chat", "callback_data": f"TAKEOVER:{chat_id}"},
-                            {"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{chat_id}"}
+                            {"text": "⏸️ Pausa", "callback_data": f"PAUSA:{chat_id}"}
                         ]],
                         parse_mode="Markdown"
                     )
@@ -3690,11 +3896,12 @@ def webhook():
         # ── Avviso "non sa rispondere" ──
         if OWNER_ID and not is_owner and bot_non_sa(reply) and not e_emergenza:
             nome_display = f"@{username}" if username else nome
-            invia_messaggio(int(OWNER_ID),
+            invia_bottoni(int(OWNER_ID),
                 f"⚠️ RISPOSTA RICHIESTA\n\n"
-                f"L'ospite {nome_display} ha chiesto qualcosa che non so rispondere:\n\n"
+                f"Ospite: {nome_display}\n"
                 f"❓ \"{testo}\"\n\n"
-                f"Premi Rispondi e scrivi la tua risposta.\n[ID:{chat_id}]"
+                f"[ID:{chat_id}]",
+                [[{"text": "💬 Rispondi qui", "callback_data": f"REPLY:ID:{chat_id}"}]]
             )
 
     except Exception:
@@ -5173,21 +5380,23 @@ def whatsapp_webhook():
                 if wa_arrabbiato:
                     invia_bottoni(int(OWNER_ID),
                         f"🚨 *ATTENZIONE — OSPITE WHATSAPP ARRABBIATO*\n\n"
-                        f"Tono frustrato/aggressivo rilevato.\n\n"
                         f"Ospite: {nome}\n\n"
                         f"❓ {_domanda_per_owner(_voce_pre_md, testo, italic=True)}\n\n"
                         f"🤖 {reply}\n\n"
-                        f"💡 Rispondi tu in reply o usa /pausa wa_{wa_from}\n\n"
                         f"[WA:{wa_from}]",
-                        [[{"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}]],
+                        [[
+                            {"text": "💬 Rispondi qui", "callback_data": f"REPLY:WA:{wa_from}"},
+                            {"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}
+                        ]],
                         parse_mode="Markdown"
                     )
                 else:
-                    invia_bottoni(int(OWNER_ID),
+                    notifica_owner_aggregata(wa_session_id,
                         f"📱 *WhatsApp* — {nome}\n\n❓ {_domanda_per_owner(_voce_pre_md, testo)}\n\n🤖 {reply}\n\n[WA:{wa_from}]",
                         [[
+                            {"text": "💬 Rispondi qui", "callback_data": f"REPLY:WA:{wa_from}"},
                             {"text": "💬 Prendi chat", "callback_data": f"TAKEOVER:{wa_session_id}"},
-                            {"text": "⏸️ Pausa AI", "callback_data": f"PAUSA:{wa_session_id}"}
+                            {"text": "⏸️ Pausa", "callback_data": f"PAUSA:{wa_session_id}"}
                         ]],
                         parse_mode="Markdown"
                     )
