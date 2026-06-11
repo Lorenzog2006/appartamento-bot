@@ -15,5 +15,16 @@
     "ultimo_msg": "2026-05-19T15:45:13",
     "in_takeover": false,
     "pausa_ai": false
+  },
+  "wa_393755774713": {
+    "canale": "whatsapp",
+    "primo_msg": "2026-06-11T18:54:38",
+    "totale_msg": 1,
+    "topic_count": {
+      "altro": 1
+    },
+    "nome": "Noemi",
+    "lingua": "italian",
+    "ultimo_msg": "2026-06-11T18:54:38"
   }
 }
