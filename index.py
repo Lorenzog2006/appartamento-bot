@@ -17,12 +17,12 @@ WA_VERIFY_TOKEN = (os.environ.get("WHATSAPP_VERIFY_TOKEN") or "").strip()
 WA_PULIZIE      = (os.environ.get("WA_PULIZIE") or "").strip()  # numero WhatsApp signora pulizie (es: 393201234567)
 NOME_PULIZIE    = (os.environ.get("NOME_PULIZIE") or "Signora delle pulizie").strip()
 
-# Coordinate appartamento (configurabili via env, default Juan les Pins centro)
+# Coordinate appartamento (configurabili via env, default = 93 Bd Raymond Poincaré, Antibes)
 try:
-    APT_LAT = float(os.environ.get("APT_LAT", "43.5641"))
-    APT_LNG = float(os.environ.get("APT_LNG", "7.1175"))
+    APT_LAT = float(os.environ.get("APT_LAT", "43.5728494"))
+    APT_LNG = float(os.environ.get("APT_LNG", "7.1009385"))
 except Exception:
-    APT_LAT, APT_LNG = 43.5641, 7.1175
+    APT_LAT, APT_LNG = 43.5728494, 7.1009385
 APT_NAME    = (os.environ.get("APT_NAME") or "La Terrasse Bleue — Juan les Pins").strip()
 APT_ADDRESS = (os.environ.get("APT_ADDRESS") or "93 Bd Raymond Poincaré, 06160 Antibes").strip()
 
