@@ -13,8 +13,8 @@
     "nome": "Lorenzo",
     "lingua": "italian",
     "ultimo_msg": "2026-06-11T19:41:21",
-    "in_takeover": false,
-    "pausa_ai": false
+    "in_takeover": true,
+    "pausa_ai": true
   },
   "wa_393755774713": {
     "canale": "whatsapp",
