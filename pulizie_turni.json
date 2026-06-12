@@ -28,5 +28,20 @@
     "confermato_at": "2026-05-19T21:23:04",
     "confermato_msg": "Ok",
     "created_at": "2026-05-19T21:22:18"
+  },
+  "turno_20260521": {
+    "checkout": "21/05/2026",
+    "next_checkin": null,
+    "ospite_uscente": "Tetiana Liakhovchuk",
+    "num_ospiti_uscenti": 4,
+    "culla_uscente": false,
+    "ospite_entrante": null,
+    "num_ospiti_entranti": 0,
+    "culla_entrante": false,
+    "inviato_subito_at": null,
+    "inviato_reminder_at": null,
+    "confermato_at": null,
+    "confermato_msg": "",
+    "created_at": "2026-06-12T04:16:39"
   }
 }
