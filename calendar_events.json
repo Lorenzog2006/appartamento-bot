@@ -114,7 +114,8 @@
     "prezzo_eur": 780.3,
     "ical_uid": "9e30ef132108a7dae3db2743caa8f18d@booking.com",
     "created_at": "2026-05-19T21:30:24",
-    "completed_at": "2026-06-12T04:16:22"
+    "completed_at": "2026-06-12T04:16:22",
+    "culla": false
   },
   "booking_5a743cb563a4": {
     "canale": "booking",
