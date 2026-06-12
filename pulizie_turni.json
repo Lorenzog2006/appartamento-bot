@@ -4,7 +4,7 @@
     "next_checkin": "20/05/2026",
     "ospite_uscente": "Filippo",
     "num_ospiti_uscenti": 3,
-    "culla_uscente": false,
+    "culla_uscente": true,
     "ospite_entrante": "Tetiana Liakhovchuk",
     "num_ospiti_entranti": 4,
     "culla_entrante": false,
