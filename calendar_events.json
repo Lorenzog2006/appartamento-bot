@@ -158,13 +158,13 @@
   "booking_600464510b0d": {
     "canale": "booking",
     "code": "600464510b0d",
-    "checkin": "21/07/2026",
-    "checkout": "28/07/2026",
+    "checkin": "25/07/2026",
+    "checkout": "29/07/2026",
     "stato": "pending_details",
     "nome": "",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "600464510b0d0205f0e2c5da2b75cafb@booking.com",
+    "ical_uid": "fcdc708cdd62916539082720d5d9e322@booking.com",
     "created_at": "2026-05-24T20:15:15"
   },
   "booking_ac689608d0c8": {
