@@ -81,7 +81,7 @@
     "canale": "booking",
     "code": "1f82f17fa22e",
     "checkin": "02/07/2027",
-    "checkout": "01/01/2028",
+    "checkout": "02/01/2028",
     "stato": "complete",
     "nome": "(Blocco Booking)",
     "num_ospiti": 0,
@@ -266,13 +266,13 @@
   "booking_3b13865fa51d": {
     "canale": "booking",
     "code": "3b13865fa51d",
-    "checkin": "01/07/2026",
+    "checkin": "02/07/2026",
     "checkout": "04/07/2026",
     "stato": "pending_details",
     "nome": "",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "d9a464efc6d20b1801bc98f72838f33f@booking.com",
+    "ical_uid": "dfceb9b04a8083497fdd3cfcd1f1e81b@booking.com",
     "created_at": "2026-06-05T08:30:34"
   },
   "airbnb_HMQX32BPHD": {
