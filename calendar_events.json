@@ -82,5 +82,17 @@
     "prezzo_eur": 0.0,
     "ical_uid": "e4d5345c5fdf71b52a58eb971a5a6fcf@booking.com",
     "created_at": "2026-07-10T20:15:36"
+  },
+  "booking_a56373f1fdea": {
+    "canale": "booking",
+    "code": "a56373f1fdea",
+    "checkin": "08/08/2026",
+    "checkout": "09/08/2026",
+    "stato": "pending_details",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "a56373f1fdea4d9599f0b8d873ea4877@booking.com",
+    "created_at": "2026-07-11T17:45:27"
   }
 }
