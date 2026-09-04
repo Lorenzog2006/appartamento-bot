@@ -1,43 +1,7 @@
 {
-  "booking_eb24c08e4db3": {
+  "booking_ed5ad4f6e5c0": {
     "canale": "booking",
-    "code": "eb24c08e4db3",
-    "checkin": "16/07/2026",
-    "checkout": "19/07/2026",
-    "stato": "seeded",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "0c1730b293c23c31b57bcfccafe9f6a2@booking.com",
-    "created_at": "2026-07-13T15:15:35"
-  },
-  "booking_6e81e6198fe1": {
-    "canale": "booking",
-    "code": "6e81e6198fe1",
-    "checkin": "07/08/2026",
-    "checkout": "09/08/2026",
-    "stato": "seeded",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "8b0e6151e0d7cca1b1a829c4c876e0a9@booking.com",
-    "created_at": "2026-07-13T15:15:35"
-  },
-  "booking_a56373f1fdea": {
-    "canale": "booking",
-    "code": "a56373f1fdea",
-    "checkin": "03/08/2026",
-    "checkout": "09/08/2026",
-    "stato": "seeded",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "2f55814339ca05866fa947ce52e77967@booking.com",
-    "created_at": "2026-07-13T15:15:35"
-  },
-  "booking_a40984904b34": {
-    "canale": "booking",
-    "code": "a40984904b34",
+    "code": "ed5ad4f6e5c0",
     "checkin": "04/09/2026",
     "checkout": "09/09/2026",
     "stato": "seeded",
@@ -45,23 +9,71 @@
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
     "ical_uid": "ed5ad4f6e5c025eca83291752df9436b@booking.com",
-    "created_at": "2026-07-13T15:15:35"
+    "created_at": "2026-09-04T20:45:27"
   },
-  "booking_d7a36912bed4": {
+  "booking_243b9e7344a2": {
     "canale": "booking",
-    "code": "d7a36912bed4",
-    "checkin": "06/09/2026",
-    "checkout": "09/09/2026",
+    "code": "243b9e7344a2",
+    "checkin": "11/09/2026",
+    "checkout": "16/09/2026",
     "stato": "seeded",
     "nome": "",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "d7a36912bed4ac7ea0575a81636d30d5@booking.com",
-    "created_at": "2026-07-13T15:15:35"
+    "ical_uid": "243b9e7344a29593e543fe52cbbb2944@booking.com",
+    "created_at": "2026-09-04T20:45:27"
   },
-  "booking_bfe739f46af9": {
+  "booking_efb1370c52d2": {
     "canale": "booking",
-    "code": "bfe739f46af9",
+    "code": "efb1370c52d2",
+    "checkin": "25/09/2026",
+    "checkout": "26/09/2026",
+    "stato": "seeded",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "efb1370c52d2770e0b302003c282e154@booking.com",
+    "created_at": "2026-09-04T20:45:27"
+  },
+  "booking_abf50d08a298": {
+    "canale": "booking",
+    "code": "abf50d08a298",
+    "checkin": "10/10/2026",
+    "checkout": "12/10/2026",
+    "stato": "seeded",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "abf50d08a298f09ee7590fee4d1d9b16@booking.com",
+    "created_at": "2026-09-04T20:45:27"
+  },
+  "booking_b7e3b032dc34": {
+    "canale": "booking",
+    "code": "b7e3b032dc34",
+    "checkin": "18/10/2026",
+    "checkout": "21/10/2026",
+    "stato": "seeded",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "b7e3b032dc34dd2c9ef9af9f67c845c2@booking.com",
+    "created_at": "2026-09-04T20:45:27"
+  },
+  "booking_5f231d254e9e": {
+    "canale": "booking",
+    "code": "5f231d254e9e",
+    "checkin": "11/11/2026",
+    "checkout": "15/11/2026",
+    "stato": "seeded",
+    "nome": "",
+    "num_ospiti": 0,
+    "prezzo_eur": 0.0,
+    "ical_uid": "5f231d254e9e6b95ef1c599524520cff@booking.com",
+    "created_at": "2026-09-04T20:45:27"
+  },
+  "booking_1e2f711cf803": {
+    "canale": "booking",
+    "code": "1e2f711cf803",
     "checkin": "05/09/2027",
     "checkout": "04/03/2028",
     "stato": "seeded",
@@ -69,126 +81,6 @@
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
     "ical_uid": "1e2f711cf80389847bd553f2481538ad@booking.com",
-    "created_at": "2026-07-13T15:15:35"
-  },
-  "booking_243b9e7344a2": {
-    "canale": "booking",
-    "code": "243b9e7344a2",
-    "checkin": "11/09/2026",
-    "checkout": "13/09/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "243b9e7344a29593e543fe52cbbb2944@booking.com",
-    "created_at": "2026-07-19T08:45:29"
-  },
-  "booking_12485d9eb431": {
-    "canale": "booking",
-    "code": "12485d9eb431",
-    "checkin": "22/08/2026",
-    "checkout": "23/08/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "12e72586399667dc62bad16fad0e7c66@booking.com",
-    "created_at": "2026-07-27T05:00:35"
-  },
-  "booking_bc06e8842e4c": {
-    "canale": "booking",
-    "code": "bc06e8842e4c",
-    "checkin": "26/10/2026",
-    "checkout": "30/10/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "bc06e8842e4c181afd371d30f19a2525@booking.com",
-    "created_at": "2026-08-08T15:00:33"
-  },
-  "booking_3ae4f7f164fa": {
-    "canale": "booking",
-    "code": "3ae4f7f164fa",
-    "checkin": "13/08/2026",
-    "checkout": "14/08/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "3868e2a6d6ba360ffc26e320c86786a9@booking.com",
-    "created_at": "2026-08-08T18:00:34"
-  },
-  "booking_6d888318d12c": {
-    "canale": "booking",
-    "code": "6d888318d12c",
-    "checkin": "14/08/2026",
-    "checkout": "15/08/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "6d888318d12c286fdb6d1c8ecc9fc6ee@booking.com",
-    "created_at": "2026-08-08T19:15:17"
-  },
-  "booking_30543885cd35": {
-    "canale": "booking",
-    "code": "30543885cd35",
-    "checkin": "17/09/2026",
-    "checkout": "20/09/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "30543885cd350127aa6abf75925aed0d@booking.com",
-    "created_at": "2026-08-14T09:30:26"
-  },
-  "booking_b7e3b032dc34": {
-    "canale": "booking",
-    "code": "b7e3b032dc34",
-    "checkin": "18/10/2026",
-    "checkout": "21/10/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "b7e3b032dc34dd2c9ef9af9f67c845c2@booking.com",
-    "created_at": "2026-08-26T21:15:17"
-  },
-  "booking_abf50d08a298": {
-    "canale": "booking",
-    "code": "abf50d08a298",
-    "checkin": "10/10/2026",
-    "checkout": "12/10/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "abf50d08a298f09ee7590fee4d1d9b16@booking.com",
-    "created_at": "2026-08-27T06:00:32"
-  },
-  "booking_5f231d254e9e": {
-    "canale": "booking",
-    "code": "5f231d254e9e",
-    "checkin": "11/11/2026",
-    "checkout": "15/11/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "5f231d254e9e6b95ef1c599524520cff@booking.com",
-    "created_at": "2026-08-27T11:45:17"
-  },
-  "booking_efb1370c52d2": {
-    "canale": "booking",
-    "code": "efb1370c52d2",
-    "checkin": "25/09/2026",
-    "checkout": "26/09/2026",
-    "stato": "pending_details",
-    "nome": "",
-    "num_ospiti": 0,
-    "prezzo_eur": 0.0,
-    "ical_uid": "efb1370c52d2770e0b302003c282e154@booking.com",
-    "created_at": "2026-08-28T09:45:18"
+    "created_at": "2026-09-04T20:45:27"
   }
 }
