@@ -75,7 +75,7 @@
     "canale": "booking",
     "code": "1e2f711cf803",
     "checkin": "23/09/2027",
-    "checkout": "22/03/2028",
+    "checkout": "23/03/2028",
     "stato": "seeded",
     "nome": "",
     "num_ospiti": 0,
@@ -122,13 +122,13 @@
   "booking_3ccd0ffe8650": {
     "canale": "booking",
     "code": "3ccd0ffe8650",
-    "checkin": "22/09/2026",
+    "checkin": "23/09/2026",
     "checkout": "24/09/2026",
     "stato": "pending_details",
     "nome": "",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "3ccd0ffe865091faba0d8532c883f55a@booking.com",
+    "ical_uid": "09eaac332d53332996501cc67561e730@booking.com",
     "created_at": "2026-09-22T08:15:25"
   }
 }
