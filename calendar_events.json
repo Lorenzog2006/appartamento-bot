@@ -26,13 +26,13 @@
   "booking_06b505919022": {
     "canale": "booking",
     "code": "06b505919022",
-    "checkin": "15/10/2027",
+    "checkin": "16/10/2027",
     "checkout": "15/04/2028",
     "stato": "seeded",
     "nome": "",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "6b6dfcb92dec8d96560ae77937203173@booking.com",
+    "ical_uid": "0b726fbbf70ce3ac4b33431a7215a21a@booking.com",
     "created_at": "2026-10-13T23:15:23"
   }
 }
