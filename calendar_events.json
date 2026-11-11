@@ -14,20 +14,20 @@
   "booking_5f231d254e9e": {
     "canale": "booking",
     "code": "5f231d254e9e",
-    "checkin": "10/11/2026",
+    "checkin": "12/11/2026",
     "checkout": "15/11/2026",
     "stato": "seeded",
     "nome": "",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "aeaf365054d86b007c47a21681ce0ff3@booking.com",
+    "ical_uid": "4ebddd112d4c881abd6e9d76a82e4dd7@booking.com",
     "created_at": "2026-10-15T04:30:39"
   },
   "booking_0b726fbbf70c": {
     "canale": "booking",
     "code": "0b726fbbf70c",
     "checkin": "12/11/2027",
-    "checkout": "11/05/2028",
+    "checkout": "12/05/2028",
     "stato": "seeded",
     "nome": "",
     "num_ospiti": 0,
