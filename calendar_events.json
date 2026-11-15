@@ -26,13 +26,13 @@
   "booking_0b726fbbf70c": {
     "canale": "booking",
     "code": "0b726fbbf70c",
-    "checkin": "15/11/2027",
+    "checkin": "16/11/2027",
     "checkout": "15/05/2028",
     "stato": "seeded",
     "nome": "",
     "num_ospiti": 0,
     "prezzo_eur": 0.0,
-    "ical_uid": "5b1b6b5859f36bff548978290ec7ec97@booking.com",
+    "ical_uid": "9702ad0ee22a9ebec4613fdd81ecb97b@booking.com",
     "created_at": "2026-10-15T04:30:39"
   },
   "booking_c3d178660a93": {
